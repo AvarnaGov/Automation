@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recharge Expiry Dashboard</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f7f9fc;
+    color: #222;
+    margin: 0;
+    padding: 20px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  h1 { margin: 0; }
+  button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  button:hover { background: #0056b3; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+  th, td {
+    border-bottom: 1px solid #ddd;
+    padding: 10px;
+    text-align: left;
+  }
+  th {
+    background: #f0f2f5;
+  }
+  tr.expired {
+    background-color: #ffeaea;
+  }
+  .status.active { color: green; font-weight: bold; }
+  .status.expired { color: red; font-weight: bold; }
+  .progress-bar {
+    height: 10px;
+    border-radius: 5px;
+    background: #ddd;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: #28a745;
+    transition: width 0.5s;
+  }
+  .progress-fill.warning { background: orange; }
+  .progress-fill.danger { background: red; }
+  /* Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4);
+    justify-content: center;
+    align-items: center;
+  }
+  .modal-content {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    width: 90%;
+    max-width: 450px;
+  }
+  .modal-content input {
+    width: 100%;
+    padding: 8px;
+    margin: 6px 0;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .close {
+    cursor: pointer;
+    font-size: 22px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Recharge Expiry Dashboard</h1>
+  <button onclick="openInsertModal()">➕ Add Record</button>
+</header>
+
+<table id="data-table">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Oulet Name</th>
+      <th>Operator Name</th>
+      <th>Mobile Number</th>
+      <th>Start Date</th>
+      <th>End Date</th>
+      <th>Days Left</th>
+      <th>Status</th>
+      <th>Progress</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<!-- Modal -->
+<div id="dataModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalTitle">Add Record</h2>
+      <span class="close" onclick="closeModal()">&times;</span>
+    </div>
+    <input type="hidden" id="recordId">
+
+    <label>Outlet Name:</label>
+    <input type="text" id="outletName" required>
+
+    <label>Operator Name:</label>
+    <input type="text" id="operatorName" required>
+
+    <label>Mobile Number:</label>
+    <input type="text" id="mobileNumber" required>
+
+    <label>Start Date:</label>
+    <input type="date" id="startDate" required>
+
+    <label>End Date:</label>
+    <input type="date" id="endDate" required>
+
+    <br><br>
+    <button id="saveRecord">Save</button>
+  </div>
+</div>
+
+<script>
+// Fetch data from API
+async function loadRechargeData() {
+  const res = await fetch("http://localhost:5000/api/recharge");
+  const data = await res.json();
+  const tbody = document.querySelector("#data-table tbody");
+  tbody.innerHTML = "";
+  const today = new Date();
+  
+ // ✅ Helper function to format date as dd-mm-yyyy
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+  data.forEach(record => {
+    const startDate = new Date(record.start_date);
+    const endDate = new Date(record.end_date);
+    const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    const daysLeft = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
+    const progress = Math.max(0, ((totalDays - daysLeft) / totalDays) * 100);
+
+    const tr = document.createElement("tr");
+    if (daysLeft <= 0) tr.classList.add("expired");
+
+    const status = daysLeft <= 0 ? "⚠ Expired" : "Active";
+    const statusClass = daysLeft <= 0 ? "expired" : "active";
+
+    let progressClass = "progress-fill";
+    if (daysLeft < 3) progressClass += " danger";
+    else if (daysLeft < 7) progressClass += " warning";
+
+    tr.innerHTML = `
+      <td>${record.id}</td>
+      <td>${record.outlet_name}</td>
+      <td>${record.operator_name}</td>
+      <td>${record.mobile_number}</td>
+      <td>${record.start_date}</td>
+      <td>${record.end_date}</td>
+      <td>${daysLeft > 0 ? daysLeft : 0}</td>
+      <td class="status ${statusClass}">${status}</td>
+      <td><div class="progress-bar"><div class="${progressClass}" style="width:${progress}%"></div></div></td>
+      <td>
+        <button class="edit-btn" data-id="${record.id}">✏ Edit</button>
+        <button class="delete-btn" data-id="${record.id}">🗑 Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+
+
+// Open Insert Modal
+function openInsertModal() {
+  document.getElementById("modalTitle").textContent = "Add Record";
+  document.getElementById("recordId").value = "";
+  document.getElementById("outletName").value = "";
+  document.getElementById("operatorName").value = "";
+  document.getElementById("mobileNumber").value = "";
+  document.getElementById("startDate").value = "";
+  document.getElementById("endDate").value = "";
+  document.getElementById("saveRecord").textContent = "Save";
+  document.getElementById("dataModal").style.display = "flex";
+}
+
+// Close Modal
+function closeModal() {
+  document.getElementById("dataModal").style.display = "none";
+}
+
+// Handle Edit
+document.addEventListener("click", async (e) => {
+  if (e.target.classList.contains("edit-btn")) {
+    const id = e.target.dataset.id;
+     console.log("Editing record ID:", id);
+    const res = await fetch(`http://localhost:5000/api/recharge`);
+     if (!res.ok) {
+      alert("Record not found or server error");
+      return;
+    }
+    const data = await res.json();
+    const record = data.find(r => r.id == id);
+    if (!record) {
+      alert("Record not found");
+      return;
+    }
+    document.getElementById("modalTitle").textContent = "Edit Record";
+    document.getElementById("recordId").value = record.id;
+    document.getElementById("outletName").value = record.outlet_name;
+    document.getElementById("operatorName").value = record.operator_name;
+    document.getElementById("mobileNumber").value = record.mobile_number;
+    document.getElementById("startDate").value = record.start_date.split("T")[0];
+    document.getElementById("endDate").value = record.end_date.split("T")[0];
+    document.getElementById("saveRecord").textContent = "Update";
+    document.getElementById("dataModal").style.display = "flex";
+  }
+});
+
+// Handle Save (Insert/Update)
+document.getElementById("saveRecord").addEventListener("click", async () => {
+  const id = document.getElementById("recordId").value;
+  const outlet_name = document.getElementById("outletName").value;
+  const operator_name = document.getElementById("operatorName").value;
+  const mobile_number = document.getElementById("mobileNumber").value;
+  const start_date = document.getElementById("startDate").value;
+  const end_date = document.getElementById("endDate").value;
+
+  const payload = { outlet_name, operator_name, mobile_number, start_date, end_date };
+  const method = id ? "PUT" : "POST";
+  const url = id
+  ? `http://localhost:5000/api/update/${id}`:
+  `http://localhost:5000/api/insert`;
+   try {
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    alert(data.message || (id ? "Updated successfully!" : "Added successfully!"));
+    closeModal();
+    loadRechargeData(); // Refresh table instantly
+  } catch (err) {
+    console.error(err);
+    alert("Failed to save record.");
+  }
+});
+
+// Handle Delete
+document.addEventListener("click", async (e) => {
+  if (e.target.classList.contains("delete-btn")) {
+    const id = e.target.dataset.id;
+    if (!confirm("Are you sure you want to delete this record?")) return;
+    const res = await fetch(`http://localhost:5000/api/recharge/${id}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+    alert(data.message || "Deleted!");
+    loadRechargeData();
+  }
+});
+
+// Initialize
+loadRechargeData();
+</script>
+</body>
+</html>

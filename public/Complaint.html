@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LPG Complaint Dashboard</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+/* ============= GLOBAL ============= */
+body {
+  font-family: 'Poppins', sans-serif;
+  background: url("background.jpg") center/cover no-repeat; color: #0c0c0c;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5 {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* ============= TOP NAVBAR ============= */
+.top-navbar {
+  background: #145022 !important;
+  padding: 14px 24px;
+}
+
+.top-navbar .navbar-brand {
+  font-size: 22px;
+  letter-spacing: 0.5px;
+  color: white !important;
+}
+
+.top-navbar .btn {
+  border-radius: 8px !important;
+  font-weight: 500;
+  padding: 8px 16px !important;
+}
+
+/* Ensure content doesn't hide behind navbar */
+.page-wrapper {
+  padding: 90px 40px 40px;
+}
+
+/* ============= CARDS ============= */
+.card {
+  border: none !important;
+  border-radius: 14px !important;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  transition: 0.25s;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+.card h5 { font-size: 14px; opacity: 0.8; }
+.card h3 { font-size: 32px; font-weight: 700; }
+
+/* Card Colors */
+.bg-warning     { background: #fde047 !important; }
+.bg-info        { background: #38bdf8 !important; }
+.bg-success     { background: #4ade80 !important; }
+.bg-secondary   { background: #94a3b8 !important; }
+
+/* ============= STATUS COLORS ============= */
+.status-pending  { color: #e11d48; font-weight: 600; }
+.status-progress { color: #d97706; font-weight: 600; }
+.status-resolved { color: #16a34a; font-weight: 600; }
+
+/* ============= TABLE ============= */
+/* Table Container */
+.table-container {
+  background-color: white;
+  border-radius: 21px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  padding: 20px;
+  width: 90%;
+  margin: 30px auto;
+  overflow: hidden;
+}
+
+/* Table Styling */
+.table thead th { background-color: #145022; color: white; position: sticky; top: 0; z-index: 1; }
+.table tbody tr { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.table tbody tr:hover { transform: scale(1.01); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); background-color: #f8fdf8; }
+
+
+
+/* ============= FORMS ============= */
+.form-control,
+.form-select,
+textarea {
+  border-radius: 10px !important;
+  border: 1px solid #cbd5e1 !important;
+  padding: 10px 12px !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  box-shadow: none !important;
+  border-color: #2563eb !important;
+}
+
+/* ============= MODALS ============= */
+.modal-content {
+  border-radius: 16px !important;
+  border: none !important;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+
+.modal-header {
+  background: #1e293b !important;
+  color: white !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+
+.modal-title { font-size: 18px; font-weight: 600; }
+
+</style>
+</head>
+<body>
+
+<!-- ================= TOP NAVBAR ================= -->
+<nav class="navbar navbar-expand-lg top-navbar shadow fixed-top">
+  <div class="container-fluid">
+<a class="navbar-brand" href="#"><img src="logo.jpg" alt="Logo" height="40" class="mt-2">LPG Complaint Dashboard</a>
+    <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <!-- Buttons on Right -->
+    <div class="ms-auto">
+      <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#newComplaintModal">
+        + New Complaint
+      </button>
+
+      <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#reportModal">
+        Monthly Report
+      </button>
+    </div>
+
+  </div>
+</nav>
+
+<!-- ================= MAIN CONTENT WRAPPER ================= -->
+<div class="page-wrapper">
+
+  
+
+  <!-- Dashboard Cards -->
+  <div class="row" id="dashboardCards">
+      
+    <div class="col-md-3"><div class="card bg-warning text-dark mb-4"><h5>Pending</h5><h3 id="pendingCount">0</h3></div></div>
+    <div class="col-md-3"><div class="card bg-info text-dark mb-4"><h5>In Progress</h5><h3 id="progressCount">0</h3></div></div>
+    <div class="col-md-3"><div class="card bg-success text-white mb-4"><h5>Resolved</h5><h3 id="resolvedCount">0</h3></div></div>
+    <div class="col-md-3"><div class="card bg-secondary text-white mb-4"><h5>Total</h5><h3 id="totalCount">0</h3></div></div>
+  </div>
+
+  <h3>Complaint List</h3>
+<div class="table-container">
+ <div class="table-wrapper table-responsive">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Ticket</th>
+        <th>Date</th>
+        <th>Outlet Name</th>
+        <th>Code</th>
+        <th>Nature of the Complaint</th>
+        <th>Category</th>
+        <th>Details of Work Done</th>
+        <th>Attended By</th>
+        <th>Reported To</th>
+        <th>Status</th>
+        <th>Change Status</th>
+        <th>Actions</th>
+      </tr>
+        <tr>
+    <th><input class="form-control form-control-sm column-filter" data-col="ticket_no"></th>
+    <th><input class="form-control form-control-sm column-filter" data-col="date"></th>
+    <th><input class="form-control form-control-sm column-filter" data-col="name_of_the_outlet"></th>
+    <th><input class="form-control form-control-sm column-filter" data-col="code"></th>
+    <th><input class="form-control form-control-sm column-filter" data-col="nature_of_complaint"></th>
+    <th><input class="form-control form-control-sm column-filter" data-col="breakdown__preventive"></th>
+    <th><input class="form-control form-control-sm column-filter" data-col="details_of_work_done"></th>
+    <th><input class="form-control form-control-sm column-filter" data-col="attended_by"></th>
+    <th><input class="form-control form-control-sm column-filter" data-col="reported_to"></th>
+    <th><input class="form-control form-control-sm column-filter" data-col="status"></th>
+    <th><input class="form-control form-control-sm column-filter" data-col="action"></th>
+        </tr>
+    </thead>
+    <tbody id="complaintsTable"></tbody>
+  </table>
+  <nav>
+  <ul class="pagination justify-content-center mt-3" id="pagination"></ul>
+</nav>
+</div>
+</div>
+
+<!-- ===================== NEW COMPLAINT MODAL ===================== -->
+<div class="modal fade" id="newComplaintModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Add New Complaint</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <div class="mb-3">
+          <label>Select Complaint Description</label>
+          <select id="descriptionSelect" class="form-select" onchange="autoFill()">
+            <option value="">-- Select --</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label>Date</label>
+          <input id="date" type="date" class="form-control" readonly>
+        </div>
+      
+        <div class="mb-3">
+          <label>Code</label>
+          <input id="code" class="form-control">
+        </div>
+
+           <div class="mb-3">
+          <label>Outlet Name</label>
+          <input id="name_of_the_outlet" class="form-control">
+        </div>
+
+        <div class="mb-3">
+          <label>Category</label>
+          <input id="category" class="form-control" readonly>
+        </div>
+
+        <div class="mb-3">
+          <label>Solution</label>
+          <textarea id="solution" class="form-control" disabled></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label>Attended By</label>
+          <input id="attended_by" class="form-control">
+        </div>
+
+        <div class="mb-3">
+          <label>Reported To</label>
+          <input id="reported_to" class="form-control">
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button class="btn btn-primary" onclick="submitComplaint()">Submit</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MONTHLY REPORT MODAL ===================== -->
+<div class="modal fade" id="reportModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Monthly Report</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input id="month" type="number" class="form-control" placeholder="Month (1-12)">
+          </div>
+          <div class="col-md-3">
+            <input id="year" type="number" class="form-control" placeholder="Year">
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-primary" onclick="monthlyReport()">Generate</button>
+          </div>
+          <div class="col-md-3">
+          <button class="btn btn-secondary" onclick="printReport()">Print PDF</button>
+         </div>
+        </div>
+
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>Ticket</th>
+              <th>Date</th>
+              <th>Outlet Name</th>
+              <th>Nature of the Complaint</th>
+              <th>Details of work Done</th>
+              <th>Attended By</th>
+              <th>Reported To</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="reportTable"></tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- jsPDF & autoTable -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+<script>
+const API = "http://localhost:5500";
+
+// Predefined complaints
+
+let complaintsCache = [];
+let allComplaints = [];
+let filteredComplaints = [];
+let currentPage = 1;
+const rowsPerPage = 20;
+
+
+function renderTable() {
+  const tbody = document.getElementById("complaintsTable");
+  tbody.innerHTML = "";
+
+  const start = (currentPage - 1) * rowsPerPage;
+  const end = start + rowsPerPage;
+  const pageData = filteredComplaints.slice(start, end);
+
+  pageData.forEach(row => {
+    const createdDate = new Date(row.date);
+    const formattedDate = `${String(createdDate.getDate()).padStart(2,'0')}/` +
+                          `${String(createdDate.getMonth()+1).padStart(2,'0')}/` +
+                          `${createdDate.getFullYear()}`;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="text-center">${row.ticket_no}</td>
+      <td class="text-center">${formattedDate}</td>
+      <td>${row.name_of_the_outlet}</td>
+      <td class="text-center">${row.code}</td>
+      <td class="text-wrap">${row.nature_of_complaint}</td>
+      <td>${row.breakdown__preventive}</td>
+      <td class="text-wrap">${row.details_of_work_done}</td>
+      <td>${row.attended_by || "-"}</td>
+      <td>${row.reported_to || "-"}</td>
+      <td><strong>${row.status}</strong></td>
+
+      <!-- Status Change Dropdown -->
+      <td>
+      <select class="form-select form-select-sm"
+              onchange="this.disabled=true; updateStatus('${row.ticket_no}', this.value)">
+            <option value="Pending" ${row.status==='Pending'?'selected':''}>Pending</option>
+            <option value="In Progress" ${row.status==='In Progress'?'selected':''}>In Progress</option>
+            <option value="Resolved" ${row.status==='Resolved'?'selected':''}>Resolved</option>
+      </select>
+      </td>
+
+
+      <!-- Actions -->
+      <td class="text-center">
+        <button class="btn btn-danger btn-sm" onclick="deleteComplaint('${row.ticket_no}')">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  renderPagination();
+}
+
+
+function renderPagination() {
+  const pagination = document.getElementById("pagination");
+  pagination.innerHTML = "";
+
+  const totalPages = Math.ceil(filteredComplaints.length / rowsPerPage);
+
+  if (totalPages <= 1) return;
+
+  for (let i = 1; i <= totalPages; i++) {
+    const li = document.createElement("li");
+    li.className = `page-item ${i === currentPage ? "active" : ""}`;
+
+    const btn = document.createElement("button");
+    btn.className = "page-link";
+    btn.textContent = i;
+    btn.onclick = () => {
+      currentPage = i;
+      renderTable();
+    };
+
+    li.appendChild(btn);
+    pagination.appendChild(li);
+  }
+}
+
+
+
+function changePage(page) {
+  currentPage = page;
+  renderTable();
+}
+
+
+function changePage(page) {
+  currentPage = page;
+  
+}
+
+
+
+// Listen to all column filters
+document.addEventListener("input", e => {
+  if (e.target.classList.contains("column-filter")) {
+    currentPage = 1;
+    applyColumnFilters();
+  }
+});
+
+function applyColumnFilters() {
+  filteredComplaints = [...allComplaints];
+
+  document.querySelectorAll(".column-filter").forEach(input => {
+    const col = input.dataset.col;
+    const value = input.value.trim().toLowerCase();
+    if (!value) return;
+
+    filteredComplaints = filteredComplaints.filter(row => {
+      let cell = row[col] ?? "";
+
+      if (col === "date") {
+        cell = new Date(cell).toLocaleDateString();
+      }
+
+      return cell.toString().toLowerCase().includes(value);
+    });
+  });
+
+  renderTable();
+}
+
+
+
+
+// Sidebar navigation
+function showSection(sectionId) {
+  document.querySelectorAll('.section').forEach(sec => sec.style.display='none');
+  document.getElementById(sectionId).style.display='block';
+}
+
+
+
+// Load dropdown
+async function loadDropdown() {
+  const sel = document.getElementById("descriptionSelect");
+  if (!sel) return;
+
+  const res = await fetch(API + "/api/complaints");
+  complaintsCache = await res.json();
+
+  // Unique nature_of_complaint
+  const uniqueComplaints = [
+    ...new Set(
+      complaintsCache
+        .map(row => row.nature_of_complaint)
+        .filter(Boolean)
+    )
+  ];
+
+  sel.innerHTML = `<option value="">-- Select --</option>`;
+
+  uniqueComplaints.forEach(complaint => {
+    const opt = document.createElement("option");
+    opt.value = complaint;
+    opt.textContent = complaint;
+    sel.appendChild(opt);
+  });
+}
+
+
+// Auto-fill category & solution
+function autoFill() {
+  const selectedComplaint =
+    document.getElementById("descriptionSelect").value;
+
+  if (!selectedComplaint) return;
+
+  // Find first matching row
+  const row = complaintsCache.find(
+    c => c.nature_of_complaint === selectedComplaint
+  );
+
+  if (!row) return;
+
+  // Autofill fields
+  document.getElementById("category").value =
+    row.breakdown__preventive || "";
+
+  document.getElementById("solution").value =
+    row.details_of_work_done || "";
+}
+
+
+// Submit complaint
+async function submitComplaint() {
+  const name_of_the_outlet = document.getElementById("name_of_the_outlet").value;
+  const nature_of_complaint = document.getElementById("descriptionSelect").value;
+  const code = document.getElementById("code").value;
+  const breakdown__preventive = document.getElementById("category").value;
+  const details_of_work_done = document.getElementById("solution").value;
+  const attended_by = document.getElementById("attended_by").value;
+  const reported_to = document.getElementById("reported_to").value;
+  
+  // ✅ Read date safely, default to today
+  let date = document.getElementById("date").value;
+  if (!date) {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    date = `${yyyy}-${mm}-${dd}`;
+  }
+
+  if (!nature_of_complaint) { alert("Select a complaint."); return; }
+
+  const res = await fetch(API + "/api/complaints", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name_of_the_outlet,
+      code,
+      nature_of_complaint,
+      breakdown__preventive,
+      details_of_work_done,
+      attended_by,
+      reported_to,
+      date
+    })
+  });
+
+  const data = await res.json();
+  alert("Complaint Submitted! Ticket ID: " + data.ticket_no);
+
+  loadComplaints();
+  loadDashboardCounts();
+}
+
+
+
+// Load complaint table
+async function loadComplaints() {
+  const res = await fetch(API + "/api/complaints");
+  allComplaints = await res.json();
+  currentPage = 1;
+  applyColumnFilters();
+}
+
+// Update status
+async function updateStatus(ticket_no, status) {
+  try {
+    const res = await fetch(API + "/api/status", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket_no, status })
+    });
+
+    if (!res.ok) {
+      throw new Error("Status update failed");
+    }
+
+    // ✅ Update local data immediately
+    allComplaints = allComplaints.map(c =>
+      c.ticket_no === ticket_no ? { ...c, status } : c
+    );
+
+    applyColumnFilters();      // re-render table
+    loadDashboardCounts();    // update cards
+
+  } catch (err) {
+    alert("Failed to update status");
+    console.error(err);
+  }
+}
+
+
+async function deleteComplaint(ticketNo) {
+  if (!confirm(`Delete complaint ${ticketNo}?`)) return;
+
+  const res = await fetch(`${API}/api/complaints/${ticketNo}`, {
+    method: "DELETE"
+  });
+
+  const data = await res.json();
+  alert(data.message || "Deleted successfully");
+
+  // Update local data
+  allComplaints = allComplaints.filter(c => c.ticket_no !== ticketNo);
+  applyColumnFilters();
+}
+
+// Search ticket
+async function searchTicket() {
+  const t=document.getElementById("searchTicket").value;
+  const res=await fetch(API+"/api/complaints/"+t);
+  const data=await res.json();
+  const div=document.getElementById("searchResult");
+  if(data.length===0){ div.innerHTML="Ticket not found."; return; }
+  const row=data[0]; div.innerHTML=`<b>${row.ticket_no}</b><br>${row.nature_of_the_complaint}<br>Status: ${row.status}`;
+}
+
+// Monthly report
+async function monthlyReport() {
+  const m=document.getElementById("month").value;
+  const y=document.getElementById("year").value;
+  const res=await fetch(API+`/api/report/${y}/${m}`);
+  const data=await res.json();
+  const tbody=document.getElementById("reportTable"); tbody.innerHTML="";
+  
+  data.forEach(row=>{ 
+     let createdDate = new Date(row.date);
+    let formattedDate = `${String(createdDate.getDate()).padStart(2, '0')}/` +
+                        `${String(createdDate.getMonth() + 1).padStart(2, '0')}/` +
+                        `${createdDate.getFullYear()}`;const tr=document.createElement("tr"); tr.innerHTML=`<td>${row.ticket_no}</td><td>${formattedDate}</td><td>${row.name_of_the_outlet}</td><td>${row.nature_of_complaint}</td><td>${row.details_of_work_done}</td><td>${row.attended_by}</td><td>${row.reported_to}</td><td>${row.status}</td>`; tbody.appendChild(tr); });
+}
+// Print PDF
+async function printReport() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const month = document.getElementById("month").value;
+    const year = document.getElementById("year").value;
+
+    if (!month || !year) { alert("Please enter month and year."); return; }
+
+    const res = await fetch(`${API}/api/report/${year}/${month}`);
+    const data = await res.json();
+    if (data.length === 0) { alert("No report data found for this month."); return; }
+
+    doc.setFontSize(16);
+    doc.text(`Monthly Report - ${month}/${year}`, 14, 20);
+
+    const columns = ["Ticket","Date","Outlet Name", "Nature of the Complaint","Work Done","Attended By","Reported To", "Status"];
+    const rows = data.map(row => {
+        const createdDate = new Date(row.date);
+        const formattedDate = `${String(createdDate.getDate()).padStart(2, '0')}/` +
+                              `${String(createdDate.getMonth() + 1).padStart(2, '0')}/` +
+                              `${createdDate.getFullYear()}`;
+        return [row.ticket_no, formattedDate,row.name_of_the_outlet, row.nature_of_complaint,row.details_of_work_done, row.attended_by,row.reported_to,row.status];
+    });
+
+    doc.autoTable({
+        startY: 30,
+        head: [columns],
+        body: rows,
+        theme: 'grid',
+        headStyles: { fillColor: [20, 80, 34], textColor: 255 },
+        styles: { fontSize: 10 },
+        didParseCell: function(data) {
+            if (data.column.index === 2) {
+                if (data.cell.raw === "Pending") data.cell.styles.textColor = [225, 29, 72];
+                if (data.cell.raw === "In Progress") data.cell.styles.textColor = [217, 119, 6];
+                if (data.cell.raw === "Resolved") data.cell.styles.textColor = [22, 163, 74];
+            }
+        }
+    });
+
+    doc.save(`Monthly_Report_${month}_${year}.pdf`);
+}
+
+// Dashboard counts
+async function loadDashboardCounts() {
+  const res=await fetch(API+"/api/complaints");
+  const data=await res.json();
+  document.getElementById("pendingCount").textContent=data.filter(d=>d.status==='Pending').length;
+  document.getElementById("progressCount").textContent=data.filter(d=>d.status==='In Progress').length;
+  document.getElementById("resolvedCount").textContent=data.filter(d=>d.status==='Resolved').length;
+  document.getElementById("totalCount").textContent=data.length;
+}
+//Delete complaint
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".delete-btn");
+  if (!btn) return;
+
+  const id = btn.dataset.id;
+  console.log("DELETE ID:", id);
+
+  if (!id || id === "undefined") {
+    alert("Delete failed: invalid ID");
+    return;
+  }
+
+  if (!confirm("Are you sure?")) return;
+
+  const res = await fetch(`http://localhost:5500/api/complaints/${id}`, {
+    method: "DELETE",
+  });
+
+  const data = await res.json();
+  alert(data.message);
+
+  loadComplaints();
+  loadDashboardCounts();
+});
+
+// Print ticket placeholder
+function printTicket(ticket_id){ alert("Print functionality for ticket: "+ticket_id); }
+
+// Initialize
+loadDropdown(); loadComplaints();loadDashboardCounts();
+const newComplaintModal = document.getElementById("newComplaintModal");
+newComplaintModal.addEventListener("show.bs.modal", () => {
+  document.getElementById("descriptionSelect").value = "";
+  document.getElementById("name_of_the_outlet").value = "";
+  document.getElementById("code").value = "";
+  document.getElementById("category").value = "";
+  document.getElementById("solution").value = "";
+  document.getElementById("attended_by").value = "";
+  document.getElementById("reported_to").value = "";
+
+  // Reset date to today
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  document.getElementById("date").value = `${yyyy}-${mm}-${dd}`;
+});
+</script>
+</body>
+</html>

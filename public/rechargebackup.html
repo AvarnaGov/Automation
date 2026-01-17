@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Recharge Expiry Dashboard</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  background-color: #f5f7fb;
+  color: #222;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+h1 { margin: 0; font-size: 22px; }
+.container {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+  padding: 20px;
+  margin-top: 15px;
+}
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 15px;
+}
+.tile {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+  padding: 12px 20px;
+  flex: 1 1 150px;
+}
+.tile h3 { margin: 0; font-size: 16px; color: #555; }
+.tile p { margin: 5px 0 0; font-size: 22px; font-weight: bold; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+th, td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+}
+th {
+  background: #f0f2f5;
+}
+tr.expired {
+  background-color: #ffeaea;
+}
+.status {
+  font-weight: bold;
+}
+.status.expired {
+  color: #c00;
+}
+.status.active {
+  color: #060;
+}
+@media (max-width: 600px) {
+  .summary { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Recharge Expiry Dashboard</h1>
+</header>
+
+<div class="container">
+  <div class="summary">
+    <div class="tile"><h3>Total Stations</h3><p id="total">0</p></div>
+    <div class="tile"><h3>Expired</h3><p id="expired">0</p></div>
+    <div class="tile"><h3>Active</h3><p id="active">0</p></div> 
+    <button id="insertData()">Insert</button>
+  </div>
+
+  <table id="data-table">
+    <thead></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+const API_URL = "http://localhost:5000/api/recharge"; // Node API endpoint
+
+window.addEventListener("load", () => {
+  loadData();
+  autoRefreshMidnight();
+});
+
+async function loadData() {
+  try {
+    const response = await fetch(API_URL);
+    const data = await response.json();
+    processData(data);
+  } catch (error) {
+    console.error("Error fetching data:", error);
+    alert("⚠ Could not load data from database.");
+  }
+}
+async function insertData(){
+
+}
+
+function processData(rows) {
+  const tbody = document.querySelector("#data-table tbody");
+  const thead = document.querySelector("#data-table thead");
+  tbody.innerHTML = "";
+  thead.innerHTML = "";
+
+  const headers = ["Id","Outlet Name","Operator Name","Mobile Number","Start Date", "End Date","Status"];
+  const trHead = document.createElement("tr");
+  headers.forEach(h => {
+    const th = document.createElement("th");
+    th.textContent = h;
+    trHead.appendChild(th);
+  });
+  thead.appendChild(trHead);
+
+  const today = new Date();
+  let expiredCount = 0, total = 0;
+  const expiredStations = [];
+
+  rows.forEach(row => {
+    const tr = document.createElement("tr");
+    const startDate = new Date(row.start_date);
+    const endDate = new Date(row.end_date);
+    const tdId = document.createElement("td");
+    tdId.textContent = row.id;
+
+    const tdOutlet = document.createElement("td");
+    tdOutlet.textContent = row.outlet_name;
+
+     const tdOperator = document.createElement("td");
+    tdOperator.textContent = row.operator_name;
+
+    const tdMobile = document.createElement("td");
+    tdMobile.textContent = row.mobile_number;
+
+    const tdStart = document.createElement("td");
+    tdStart.textContent = formatDate(startDate);
+
+    const tdEnd = document.createElement("td");
+    tdEnd.textContent = formatDate(endDate);
+
+    const tdStatus = document.createElement("td");
+    tdStatus.classList.add("status");
+
+    if (today > endDate) {
+      tr.classList.add("expired");
+      tdStatus.textContent = "⚠ Expired";
+      tdStatus.classList.add("expired");
+      expiredCount++;
+      expiredStations.push(row.station_name);
+    } else {
+      tdStatus.textContent = "Active";
+      tdStatus.classList.add("active");
+    }
+
+    tr.append(tdId,tdOutlet,tdOperator,tdMobile,tdStart, tdEnd, tdStatus);
+    tbody.appendChild(tr);
+    total++;
+  });
+
+  document.getElementById("total").textContent = total;
+  document.getElementById("expired").textContent = expiredCount;
+  document.getElementById("active").textContent = total - expiredCount;
+
+  if (expiredCount > 0) {
+    alert("⚠ Warning! These stations have exceeded their end date:\n\n" + expiredStations.join("\n"));
+  } else {
+    alert("✅ All stations are within their recharge period!");
+  }
+}
+
+function formatDate(date) {
+  const d = String(date.getDate()).padStart(2, "0");
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const y = date.getFullYear();
+  return `${d}-${m}-${y}`;
+}
+
+function autoRefreshMidnight() {
+  const now = new Date();
+  const nextMidnight = new Date();
+  nextMidnight.setHours(24, 0, 0, 0);
+  const msUntilMidnight = nextMidnight - now;
+  setTimeout(() => {
+    loadData();
+    autoRefreshMidnight();
+  }, msUntilMidnight);
+}
+</script>
+
+</body>
+</html>

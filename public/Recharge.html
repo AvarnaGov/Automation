@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recharge Expiry Dashboard</title>
+<style>
+body { font-family: 'Segoe UI', Arial, sans-serif; background:#f4f6fa; color:#222; margin:0; padding:0; }
+header { background:#0066cc; color:white; padding:14px 22px; display:flex; justify-content:space-between; align-items:center; }
+h1 { margin:0; font-size:20px; }
+input[type=file] { background:white; color:#0066cc; padding:8px 10px; border-radius:6px; border:none; cursor:pointer; }
+.container { max-width:1000px; margin:24px auto; background:white; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,0.08); padding:18px; }
+.summary { display:flex; gap:14px; margin-bottom:14px; flex-wrap:wrap; }
+.tile { background:linear-gradient(135deg,#e0ecff,#f0f5ff); border-radius:10px; flex:1 1 180px; padding:12px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,0.04); }
+.tile h3{ margin:0; font-size:14px; color:#444; } .tile p{ margin:8px 0 0; font-size:26px; font-weight:700; color:#004d99; }
+table { width:100%; border-collapse:collapse; margin-top:8px; }
+th, td { padding:10px 8px; border-bottom:1px solid #eee; text-align:left; }
+th { background:#f6f8fb; color:#333; }
+tr.expired { background:#fff0f0; }
+.status { font-weight:700; }
+.status.expired{ color:#b00000; } .status.active{ color:#0a7a2f; }
+.progress-bar { height:10px; border-radius:6px; background:#eee; overflow:hidden; width:220px; }
+.progress-bar-inner { height:100%; transition: width .35s ease; }
+.progress-green{ background:#4caf50; } .progress-orange{ background:#ff9800; } .progress-red{ background:#f44336; }
+@media (max-width:700px){ .progress-bar{ width:100px; } }
+
+/* ====== STYLED POPUP ====== */
+#popup {
+position: fixed;
+top: -200px;
+left: 50%;
+transform: translateX(-50%);
+background: #f44336;
+color: white;
+padding: 15px 25px;
+border-radius: 8px;
+box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+font-size: 15px;
+max-width: 500px;
+width: 90%;
+text-align: left;
+z-index: 9999;
+opacity: 0;
+transition: all 0.5s ease;
+}
+#popup.show {
+top: 30px;
+opacity: 1;
+}
+#popup h3 { margin: 0 0 8px; font-size: 16px; }
+#popup ul { margin: 0; padding-left: 20px; }
+#popup button {
+background: white;
+color: #f44336;
+border: none;
+border-radius: 4px;
+padding: 5px 10px;
+font-weight: bold;
+cursor: pointer;
+float: right;
+}
+</style>
+</head>
+<body>
+
+<header>
+<h1>Recharge Expiry Dashboard</h1>
+<input id="fileInput" type="file" accept=".csv,.xlsx" />
+</header>
+
+<!-- 🔔 Popup container -->
+<div id="popup">
+<button onclick="hidePopup()">✖</button>
+<h3>⚠ Warning — Expired Stations</h3>
+<ul id="popupList"></ul>
+</div>
+
+<div class="container">
+<div class="summary">
+<div class="tile"><h3>Total Stations</h3><p id="total">0</p></div>
+<div class="tile"><h3>Active</h3><p id="active">0</p></div>
+<div class="tile"><h3>Expired</h3><p id="expired">0</p></div>
+</div>
+
+<table id="data-table">
+<thead></thead>
+<tbody></tbody>
+</table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+// ==== Utility functions ====
+function excelSerialToDate(serial) {
+  const utcDays = Math.floor(serial - 25569);
+  const utcValue = utcDays * 86400;
+  const dateInfo = new Date(utcValue * 1000);
+  const fractionalDay = serial - Math.floor(serial);
+  const secondsInDay = Math.round(86400 * fractionalDay);
+  dateInfo.setSeconds(dateInfo.getSeconds() + secondsInDay);
+  return new Date(dateInfo.getFullYear(), dateInfo.getMonth(), dateInfo.getDate());
+}
+function parseDate(input) {
+  if (input == null || input === '') return null;
+  if (input instanceof Date) return isNaN(input) ? null : input;
+  if (typeof input === 'number') return excelSerialToDate(input);
+  const s = input.toString().trim();
+  if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(s)) {
+    const [y,m,d] = s.split(/[-/]/).map(Number);
+    return new Date(y, m-1, d);
+  }
+  if (/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(s)) {
+    const [d,m,y] = s.split(/[-/]/).map(Number);
+    return new Date(y, m-1, d);
+  }
+  const d2 = new Date(s);
+  return isNaN(d2) ? null : d2;
+}
+function formatDate(date) {
+  if (!(date instanceof Date) || isNaN(date)) return '';
+  return `${String(date.getDate()).padStart(2,'0')}-${String(date.getMonth()+1).padStart(2,'0')}-${date.getFullYear()}`;
+}
+
+// ==== Popup ====
+function showPopup(stations) {
+  const popup = document.getElementById("popup");
+  const list = document.getElementById("popupList");
+  list.innerHTML = stations.map(s => `<li>${s}</li>`).join('');
+  popup.classList.add("show");
+  setTimeout(() => popup.classList.remove("show"), 10000);
+}
+function hidePopup() {
+  document.getElementById("popup").classList.remove("show");
+}
+
+// ==== Globals ====
+let fullData = [];
+
+// ==== File handling ====
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  if (file.name.endsWith('.csv')) {
+    reader.onload = ev => {
+      const rows = ev.target.result.split(/\r?\n/).map(r => r.split(',')).filter(r=>r.length);
+      processData(rows);
+    };
+    reader.readAsText(file);
+  } else if (file.name.endsWith('.xlsx')) {
+    reader.onload = ev => {
+      const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      processData(rows);
+    };
+    reader.readAsArrayBuffer(file);
+  } else alert('Upload CSV or Excel file only.');
+});
+
+function processData(rows) {
+  if (!rows || rows.length < 2) return;
+  const headers = rows[0];
+  const tbody = document.querySelector('#data-table tbody');
+  const thead = document.querySelector('#data-table thead');
+  tbody.innerHTML = ''; thead.innerHTML = '';
+  const trh = document.createElement('tr');
+  headers.forEach(h => { const th=document.createElement('th'); th.textContent=h; trh.appendChild(th); });
+  ['Progress','Status'].forEach(x => { const th=document.createElement('th'); th.textContent=x; trh.appendChild(th); });
+  thead.appendChild(trh);
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  fullData = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (r.length < 3) continue;
+    const name = (r[0] || '').toString().trim();
+    if (!name) continue;
+    const start = parseDate(r[1]);
+    const end = parseDate(r[2]);
+    fullData.push({ name, start, end, raw: r });
+  }
+
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.querySelector('#data-table tbody');
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  // Sorting:
+  // 1. Expired first
+  // 2. Among actives — shorter duration first
+  // 3. Then earliest expiry
+  // 4. Then most recent start date
+  const data = [...fullData].sort((a,b) => {
+    const aValid = a.start && a.end;
+    const bValid = b.start && b.end;
+    if (!aValid && !bValid) return 0;
+    if (!aValid) return 1;
+    if (!bValid) return -1;
+
+    const aExpired = a.end < today;
+    const bExpired = b.end < today;
+    if (aExpired && !bExpired) return -1;
+    if (!aExpired && bExpired) return 1;
+
+    const aDuration = (a.end - a.start);
+    const bDuration = (b.end - b.start);
+    if (aDuration !== bDuration) return aDuration - bDuration; // shorter first
+
+    if (a.end.getTime() !== b.end.getTime()) return a.end - b.end; // sooner expiry
+    return b.start - a.start; // most recent start
+  });
+
+  tbody.innerHTML = '';
+  let total=0, expired=0, active=0;
+  const expiredStations=[];
+
+  for (const row of data) {
+    const { name, start, end, raw } = row;
+    const tr=document.createElement('tr');
+
+    const td1=document.createElement('td'); td1.textContent=name; tr.appendChild(td1);
+    const td2=document.createElement('td'); td2.textContent=start?formatDate(start):raw[1]; tr.appendChild(td2);
+    const td3=document.createElement('td'); td3.textContent=end?formatDate(end):raw[2]; tr.appendChild(td3);
+
+    const td4=document.createElement('td');
+    const pb=document.createElement('div'); pb.className='progress-bar';
+    const inner=document.createElement('div'); inner.className='progress-bar-inner';
+    pb.appendChild(inner); td4.appendChild(pb); tr.appendChild(td4);
+
+    const td5=document.createElement('td'); td5.className='status'; tr.appendChild(td5);
+
+    if(!start||!end||isNaN(start)||isNaN(end)){
+      td5.textContent='Invalid Dates'; td5.style.color='#999'; tbody.appendChild(tr); total++; continue;
+    }
+
+    const totalDays=(end-start)/(1000*3600*24);
+    const used=(today-start)/(1000*3600*24);
+    let pct=Math.min(Math.max((used/totalDays)*100,0),100);
+
+    if(today>end){
+      inner.classList.add('progress-red'); inner.style.width='100%';
+      td5.textContent='⚠ Expired'; td5.classList.add('expired'); tr.classList.add('expired');
+      expiredStations.push(name); expired++;
+    } else {
+      inner.classList.add(pct > 80 ? 'progress-orange' : 'progress-green');
+      inner.style.width = pct + '%';
+      const daysLeft = Math.ceil((end - today) / (1000 * 3600 * 24));
+      td5.textContent = `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`;
+      td5.style.color = pct > 80 ? '#e69500' : '#0a7a2f';
+      td5.classList.add('active');
+      active++;
+    }
+
+    tbody.appendChild(tr);
+    total++;
+  }
+
+  document.getElementById('total').textContent=total;
+  document.getElementById('expired').textContent=expired;
+  document.getElementById('active').textContent=active;
+
+  if(expiredStations.length>0) showPopup(expiredStations);
+}
+</script>
+</body>
+</html>
