@@ -1,41 +1,13 @@
 // server.js
-
-
-// OR allow specific origin
-
-// ======================= IMPORTS =======================
 import express from "express";
-import mysql from "mysql2/promise";
+import mysql from "mysql2/promise"; // ✅ Use promise version
 import cors from "cors";
 import bcrypt from "bcrypt";
-import path from "path";
-import { fileURLToPath } from "url";
 
-// ======================= APP INIT =======================
 const app = express();
-
-// ======================= MIDDLEWARE =======================
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-app.use(cors({
-  origin: "http://10.128.27.85:5000", // your frontend IP
-  methods: ["GET","POST","PUT","DELETE"],
-  credentials: true
-}));
-
-// ======================= PATH FIX (ES MODULE) =======================
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// ======================= SERVE FRONTEND =======================
-app.use(express.static(path.join(__dirname, "public")));
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "Loginpage.html"));
-});
-
 
 // ✅ MySQL connection
 const db = await mysql.createConnection({
@@ -51,6 +23,7 @@ console.log("✅ Connected to MySQL Database");
 app.post("/api/register", async (req, res) => {
   try {
     const { username, password, role } = req.body;
+   
 
     await db.query(
       "INSERT INTO users(username, password, role) VALUES (?, ?, ?)",
@@ -70,10 +43,11 @@ app.post("/api/login", async (req, res) => {
     const { username, password } = req.body;
 
     const [users] = await db.query("SELECT * FROM users WHERE username = ?", [username]);
+
     if (users.length === 0) return res.json({ error: "User not found" });
 
     const user = users[0];
-    const passwordMatch =
+      const passwordMatch =
       user.password.length < 30
         ? password === user.password
         : await bcrypt.compare(password, user.password);
@@ -90,25 +64,22 @@ app.post("/api/login", async (req, res) => {
 // ======================= GET ALL RECHARGE DATA =======================
 app.get("/api/recharge", async (req, res) => {
   try {
-    const [results] = await db.query(`
-      SELECT
-        r.id,
-        r.outlet_name,
-        r.operator_name,
-        r.operator_2,
-        r.mobile_number,
-        r.base_start_date,
-        r.base_end_date,
-        u.plan_name,
-        u.upgrade_start_date,
-        u.upgrade_end_date,
-        u.upgraded_by
-      FROM recharge_data r
-      LEFT JOIN recharge_upgrades u
-        ON u.recharge_id = r.id
-      ORDER BY r.id;
-    `);
+    const [results] = await db.query(`SELECT
+  r.id,
+  r.outlet_name,
+  r.operator_name,
+  r.operator_2,
+  r.mobile_number,
+  r.start_date,
+  r.end_date,
 
+  MAX(u.end_date) AS upgrade_end   -- 🔥 REQUIRED FOR UI
+
+  FROM recharge_data r
+  LEFT JOIN recharge_upgrades u
+    ON u.recharge_id = r.id
+
+  GROUP BY r.id;`);
     res.json(results);
   } catch (err) {
     console.error("❌ Database query error:", err);
@@ -126,17 +97,17 @@ app.post("/api/insert", async (req, res) => {
       !data.operator_name ||
       !data.operator_2 ||
       !data.mobile_number ||
-      !data.base_start_date ||
-      !data.base_end_date) {
+      !data.start_date ||
+      !data.end_date) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
     const [result] = await db.query(
       `INSERT INTO recharge_data 
-        (outlet_name, operator_name, operator_2, mobile_number, base_start_date, base_end_date)
+        (outlet_name, operator_name, operator_2, mobile_number, start_date, end_date)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [ data.outlet_name, data.operator_name, data.operator_2,
-        data.mobile_number, data.base_start_date, data.base_end_date]
+        data.mobile_number, data.start_date, data.end_date]
     );
 
     const newRecord = { 
@@ -145,11 +116,14 @@ app.post("/api/insert", async (req, res) => {
       operator_name: data.operator_name,
       operator_2: data.operator_2,
       mobile_number: data.mobile_number,
-      base_start_date: data.base_start_date,
-      base_end_date: data.base_end_date
-    };
-
-    await logHistory(user, "INSERT", `Inserted new record: ${JSON.stringify(data)}`);
+      start_date: data.start_date,
+      end_date: data.end_date
+        };
+      await logHistory(
+      user,
+      "INSERT",
+      `Inserted new record: ${JSON.stringify(data)}`
+    );
     res.status(201).json(newRecord);
 
   } catch (err) {
@@ -172,15 +146,15 @@ app.put("/api/update/:id", async (req, res) => {
 
     await db.query(
       `UPDATE recharge_data 
-       SET outlet_name = ?, operator_name = ?, operator_2 = ?, mobile_number = ?, base_start_date = ?, base_end_date = ?
+       SET outlet_name = ?, operator_name = ?, operator_2 = ?, mobile_number = ?, start_date = ?, end_date = ?
        WHERE id = ?`,
       [
         newData.outlet_name,
         newData.operator_name,
         newData.operator_2,
         newData.mobile_number,
-        newData.base_start_date,
-        newData.base_end_date,
+        newData.start_date,
+        newData.end_date,
         id
       ]
     );
@@ -200,18 +174,23 @@ ${JSON.stringify(newData, null, 2)}
   }
 });
 
+
 // ======================= DELETE RECHARGE =======================
 app.delete("/api/recharge/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const user = req.headers.user || "Unknown User";
 
+    // Fetch old record before deleting
     const [rows] = await db.query("SELECT * FROM recharge_data WHERE id=?", [id]);
     const oldRecord = rows[0];
-
     await db.query("DELETE FROM recharge_data WHERE id = ?", [id]);
 
-    await logHistory(user, "DELETE", `Deleted record: ${JSON.stringify(oldRecord)}`);
+     await logHistory(
+      user,
+      "DELETE",
+      `Deleted record: ${JSON.stringify(oldRecord)}`
+    );
     res.json({ message: "Record deleted successfully!" });
   } catch (err) {
     console.error("❌ Delete error:", err);
@@ -220,98 +199,78 @@ app.delete("/api/recharge/:id", async (req, res) => {
 });
 
 // ======================= UPGRADE =======================
-app.post("/api/upgrade/:rechargeId", async (req, res) => {
-  const { rechargeId } = req.params;
-  const { outlet_name, plan_name, upgrade_start_date, upgrade_end_date, upgraded_by } = req.body;
-
-  if (!plan_name || !upgrade_start_date || !upgrade_end_date || !upgraded_by || !outlet_name) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
-
+app.post("/api/upgrade/:id", async (req, res) => {
   try {
-    // 1️⃣ Check if an upgrade already exists
+    const rechargeId = req.params.id;
+    const { plan_name, start_date, end_date } = req.body;
+    const upgradedBy = req.headers.user || "Unknown";
+    console.log("BODY:", req.body);
+    console.log("PARAM ID:", req.params.id);
+
+    if (!plan_name || !start_date || !end_date) {
+      return res.status(400).json({ message: "Missing upgrade details" });
+    }
+
+    // 1️⃣ Get outlet name
     const [rows] = await db.query(
-      "SELECT id FROM recharge_upgrades WHERE recharge_id = ?",
+      "SELECT outlet_name FROM recharge_data WHERE id = ?",
       [rechargeId]
     );
 
-    if (rows.length > 0) {
-      // ✅ Update existing
-      await db.query(
-        `UPDATE recharge_upgrades
-         SET outlet_name = ?, plan_name = ?, upgrade_start_date = ?, upgrade_end_date = ?, upgraded_by = ?
-         WHERE recharge_id = ?`,
-        [outlet_name, plan_name, upgrade_start_date, upgrade_end_date, upgraded_by, rechargeId]
-      );
-      return res.json({ message: "Upgrade updated successfully" });
-    } else {
-      // ✅ Insert new
-      await db.query(
-        `INSERT INTO recharge_upgrades
-         (recharge_id, outlet_name, plan_name, upgrade_start_date, upgrade_end_date, upgraded_by)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [rechargeId, outlet_name, plan_name, upgrade_start_date, upgrade_end_date, upgraded_by]
-      );
-        await logHistory(
-      upgraded_by,
-      "UPGRADE",
-      `Upgraded plan for outlet ${outlet_name}: ${plan_name} (${upgrade_start_date} → ${upgrade_end_date})`
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Recharge record not found" });
+    }
+
+    const outletName = rows[0].outlet_name;
+
+    // 2️⃣ Insert upgrade record
+    await db.query(
+      `INSERT INTO recharge_upgrades
+       (recharge_id, outlet_name, plan_name, start_date, end_date, upgraded_by)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [rechargeId, outletName, plan_name, start_date, end_date, upgradedBy]
     );
 
-      return res.json({ message: "Upgrade added successfully" });
-    }
+    // 3️⃣ Update main recharge dates
+    await db.query(
+      `UPDATE recharge_data
+       SET start_date = ?, end_date = ?
+       WHERE id = ?`,
+      [start_date, end_date, rechargeId]
+    );
+
+    // 4️⃣ Log history
+    await logHistory(
+      upgradedBy,
+      "UPGRADE",
+      `Upgraded plan for outlet ${outletName}: ${plan_name} (${start_date} → ${end_date})`
+    );
+
+    res.json({ message: "Plan upgraded successfully" });
+
   } catch (err) {
     console.error("❌ SQL ERROR:", err);
-    return res.status(500).json({ message: err.sqlMessage || err.message });
+  return res.status(500).json({
+    message: err.sqlMessage || err.message
+  });
   }
 });
-
-
-// DELETE ALL upgrades for a recharge
-app.delete("/api/recharge-upgrades/:rechargeId", async (req, res) => {
-  const { rechargeId } = req.params;
-
-  try {
-    const [result] = await db.query(
-      "DELETE FROM recharge_upgrades WHERE recharge_id = ?",
-      [rechargeId]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({
-        error: "No upgrade found for this recharge"
-      });
-    }
-
-    return res.json({ message: "Upgrade deleted successfully" });
-
-  } catch (err) {
-    console.error("❌ Delete error:", err);
-    return res.status(500).json({
-      error: err.sqlMessage || err.message
-    });
-  }
-});
-
-
 
 
 // ======================= HISTORY LOG =======================
-function logHistory(user_name, action, details){
-  const query = "INSERT INTO history_log(user_name, action, details) VALUES (?, ?, ?)";
+function logHistory(user_name,action,details){
+  const query = "INSERT INTO history_log( user_name, action, details) VALUES ( ?, ?,?)";
   db.query(query, [user_name, action, details], (err) =>{
     if(err) console.error("History log error")
   })
 }
-
-// ======================= EDIT COUNT =======================
 app.get("/api/edit-count/:id", async (req, res) => {
   try {
     const id = req.params.id;
 
     const [rows] = await db.query(
        "SELECT COUNT(*) AS edits FROM history_log WHERE id = ? AND action = 'UPDATE'",
-       [id]
+    [id]
     );
 
     res.json({ edits: rows[0].edits || 0 });
@@ -321,7 +280,7 @@ app.get("/api/edit-count/:id", async (req, res) => {
   }
 });
 
-// ======================= HISTORY FILTER =======================
+
 app.get("/api/history", async (req, res) => {
   try {
     const role = req.headers.role;
@@ -332,6 +291,7 @@ app.get("/api/history", async (req, res) => {
     let params = [];
 
     if (start && end) {
+      // Include all timestamps from start 00:00:00 to end 23:59:59
       query += " WHERE timestamp >= ? AND timestamp <= ?";
       params.push(`${start} 00:00:00`, `${end} 23:59:59`);
     } else if (start) {
@@ -343,6 +303,8 @@ app.get("/api/history", async (req, res) => {
     }
 
     query += " ORDER BY timestamp DESC";
+    console.log("QUERY:", query, params);
+
     const [rows] = await db.query(query, params);
     res.json(rows);
   } catch (err) {
@@ -351,82 +313,54 @@ app.get("/api/history", async (req, res) => {
   }
 });
 
+const prefixMap = {
+  "Dispenser": "D",
+  "Billing": "B",
+  "Redeem": "R",
+  "Internet issue":"I",
+  "Camera display":"C",
+  "Firewall":"F"
+};
 
 // Generate ticket ID (Category + Incremental Number)
-async function generateTicketID(code) {
-  const prefix = code || "GEN";
+async function generateTicketID(category) {
+  const prefix = prefixMap[category] || "GEN";
 
-  await db.beginTransaction();
-
-  // Lock row for this code
+  // 1. Read current counter
   const [rows] = await db.query(
-    "SELECT counter FROM ticket_counters WHERE code = ? FOR UPDATE",
-    [prefix]
+    "SELECT counter FROM ticket_counters WHERE category = ?",
+    [category]
   );
 
-  let counter;
+  let counter = rows.length ? rows[0].counter : 0;
+  counter++;
 
-  if (rows.length === 0) {
-    counter = 1;
-    await db.query(
-      "INSERT INTO ticket_counters (code, counter) VALUES (?, ?)",
-      [prefix, counter]
-    );
-  } else {
-    counter = rows[0].counter + 1;
-    await db.query(
-      "UPDATE ticket_counters SET counter = ? WHERE code = ?",
-      [counter, prefix]
-    );
-  }
+  // 2. Update counter
+  await db.query(
+    "UPDATE ticket_counters SET counter = ? WHERE category = ?",
+    [counter, category]
+  );
 
-  await db.commit();
-
-  return `${prefix}-${String(counter).padStart(4, "0")}`;
+  // 3. Format ticket: PREFIX-XXXX
+  const formatted = String(counter).padStart(4, "0");
+  return `${prefix}-${formatted}`;
 }
 
 // --- Add new complaint ---
 
 app.post("/api/complaints", async (req, res) => {
   try {
-    const {
-      complaint_date,
-      name_of_the_outlet,
-      code,
-      nature_of_complaint,
-      breakdown__preventive,
-      details_of_work_done,
-      attended_by,
-      reported_to
-    } = req.body;
-
-    console.log("DATE RECEIVED:", complaint_date); // ✅ will now show correct date
-
-    const ticket_no = await generateTicketID(code);
-
+    const { outlet_name, description, category, solution, attended_by, reported_to } = req.body;
+    const ticket_id = await generateTicketID(category);
     await db.query(
-      `INSERT INTO automation_complaint 
-      (ticket_no, complaint_date, name_of_the_outlet, code,
-       nature_of_complaint, breakdown__preventive,
-       details_of_work_done, attended_by, reported_to)
-      VALUES (?,?,?,?,?,?,?,?,?)`,
-      [
-        ticket_no,
-        complaint_date,
-        name_of_the_outlet,
-        code,
-        nature_of_complaint,
-        breakdown__preventive,
-        details_of_work_done,
-        attended_by,
-        reported_to
-      ]
+      `INSERT INTO complaints 
+      (ticket_id, outlet_name, description, category, solution, attended_by, reported_to)
+      VALUES (?,?, ?, ?, ?, ?, ?)`,
+      [ticket_id, outlet_name, description, category, solution, attended_by, reported_to]
     );
-
-    res.json({ success: true, ticket_no });
-
+    res.json({ success: true, ticket_id });
   } catch (err) {
-    console.error("❌ INSERT ERROR:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -437,19 +371,18 @@ app.get("/api/complaints", async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT 
-        ticket_no,
-        complaint_date,
-        name_of_the_outlet,
-        code,
-        nature_of_complaint,
-        breakdown__preventive,
-        service_engineer,
-        rectified_on,
-        interruption_of_sales_if_any__time_duration,
-        details_of_work_done,
-        status
-      FROM automation_complaint
-      
+        ticket_id,
+        description,
+        category,
+        solution,
+        attended_by,
+        reported_to,
+        status,
+        status_change_count,
+        created_at,
+        outlet_name
+      FROM complaints
+      ORDER BY created_at DESC
     `);
     res.json(rows);
   } catch (err) {
@@ -464,7 +397,7 @@ app.delete("/api/complaints/:ticket", async (req, res) => {
   try {
     const { ticket } = req.params;  // ✅ match the URL param
     const [rows] = await db.query(
-      "SELECT * FROM automation_complaint WHERE ticket_no = ?",
+      "SELECT * FROM complaints WHERE ticket_id = ?",
       [ticket]
     );
     const complaint = rows[0];
@@ -473,7 +406,7 @@ app.delete("/api/complaints/:ticket", async (req, res) => {
       return res.status(404).json({ message: "Complaint not found" });
     }
 
-    await db.query("DELETE FROM automation_complaint WHERE ticket_no = ?", [ticket]);
+    await db.query("DELETE FROM complaints WHERE ticket_id = ?", [ticket]);
 
     res.json({ message: `Complaint ${ticket} deleted successfully!` });
   } catch (err) {
@@ -488,7 +421,7 @@ app.get("/api/complaints/:ticket", async (req, res) => {
   try {
     const ticket = req.params.ticket;
     const [rows] = await db.query(
-      "SELECT * FROM automation_complaint WHERE ticket_no = ?",
+      "SELECT * FROM complaints WHERE ticket_id = ?",
       [ticket]
     );
     res.json(rows);
@@ -501,12 +434,12 @@ app.get("/api/complaints/:ticket", async (req, res) => {
 // --- Update complaint status ---
 app.put("/api/status", async (req, res) => {
   try {
-    const { ticket_no, status } = req.body;
+    const { ticket_id, status } = req.body;
 
     // Get current count
     const [rows] = await db.query(
-      "SELECT status_change_count FROM automation_complaint WHERE ticket_no = ?",
-      [ticket_no]
+      "SELECT status_change_count FROM complaints WHERE ticket_id = ?",
+      [ticket_id]
     );
 
     if (rows.length === 0) {
@@ -524,12 +457,12 @@ app.put("/api/status", async (req, res) => {
 
     // Update status + increment counter
     const [update] = await db.query(
-      "UPDATE automation_complaint SET status = ?, status_change_count = ? WHERE ticket_no = ?",
-      [status, count + 1, ticket_no]
+      "UPDATE complaints SET status = ?, status_change_count = ? WHERE ticket_id = ?",
+      [status, count + 1, ticket_id]
     );
 
     console.log("Rows updated:", update.affectedRows);  // DEBUG LINE
-     console.log(ticket_no, count, status);
+     console.log(ticket_id, count, status);
 
     res.json({ success: true });
 
@@ -547,9 +480,9 @@ app.get("/api/report/:year/:month", async (req, res) => {
   try {
     const { year, month } = req.params;
     const [rows] = await db.query(
-      `SELECT * FROM automation_complaint 
-       WHERE YEAR(date) = ? AND MONTH(date) = ? 
-       ORDER BY date DESC`,
+      `SELECT * FROM complaints 
+       WHERE YEAR(created_at) = ? AND MONTH(created_at) = ? 
+       ORDER BY created_at DESC`,
       [year, month]
     );
     res.json(rows);
@@ -560,11 +493,10 @@ app.get("/api/report/:year/:month", async (req, res) => {
 });
 
 
-// ======================= OTHER ENDPOINTS (Complaints etc.) =======================
-// Keep all complaints code unchanged as your column names are unrelated
+
+
 
 // ======================= START SERVER =======================
 const PORT = 5000;
-app.listen(PORT, "0.0.0.0",()=> {
-  console.log("Server is running on port 5000")
-});
+app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+

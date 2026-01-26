@@ -1,0 +1,152 @@
+const path = require("path");
+const XLSX = require("xlsx");
+const mysql = require("mysql2/promise");
+
+// ================= CONFIG =================
+
+const excelFile = path.join(
+  __dirname,
+  "uploads",
+  "KRTF--Service Logs - 2025.xlsx"
+);
+
+const dbConfig = {
+  host: "localhost",
+  user: "root",
+  password: "Auto123!",
+  database: "Recharge_db"
+};
+
+const TABLE_NAME = "automation_complaint";
+
+// =========================================
+
+
+// Clean Excel headers → DB-style names
+function cleanColumnName(name) {
+  if (!name) return null;
+  return name
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+}
+
+// Convert Excel serial date → MySQL DATETIME
+function excelDateToMySQL(serial) {
+  if (typeof serial !== "number") return null;
+  const jsDate = new Date((serial - 25569) * 86400 * 1000);
+  return jsDate.toISOString().slice(0, 19).replace("T", " ");
+}
+
+// Get DB table columns
+async function getTableColumns(conn, tableName) {
+  const [rows] = await conn.execute(
+    `SHOW COLUMNS FROM \`${tableName}\``
+  );
+  return rows.map(r => r.Field);
+}
+
+// ================= IMPORT LOGIC =================
+
+async function importExcelToExistingTable(conn) {
+  const workbook = XLSX.readFile(excelFile);
+  const tableColumns = await getTableColumns(conn, TABLE_NAME);
+
+  let insertedRows = 0;
+
+  for (const sheetName of workbook.SheetNames) {
+    console.log(`📄 Processing sheet: ${sheetName}`);
+
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      defval: null
+    });
+
+    if (!rows.length) continue;
+
+    // 🔍 Find real header row (row with MOST text cells)
+    let headerRowIndex = -1;
+    let maxTextCells = 0;
+
+    rows.forEach((row, idx) => {
+      if (!Array.isArray(row)) return;
+      const textCells = row.filter(
+        c => typeof c === "string" && c.trim() !== ""
+      ).length;
+
+      if (textCells > maxTextCells) {
+        maxTextCells = textCells;
+        headerRowIndex = idx;
+      }
+    });
+
+    if (headerRowIndex === -1) continue;
+
+    const excelHeaders = rows[headerRowIndex].map(cleanColumnName);
+    const dataRows = rows.slice(headerRowIndex + 1);
+
+    console.log("📌 Excel headers:", excelHeaders);
+
+    for (const row of dataRows) {
+      // Skip completely empty rows
+      if (!row || row.every(v => v === null || v === "")) continue;
+
+      const dbRow = {};
+
+      excelHeaders.forEach((col, i) => {
+        if (!tableColumns.includes(col)) return;
+
+        let value = row[i] ?? null;
+
+        // Safe date handling
+        if (col.includes("date")) {
+          if (typeof value === "number") {
+            value = excelDateToMySQL(value);
+          } else if (typeof value === "string") {
+            const d = new Date(value);
+            value = isNaN(d)
+              ? null
+              : d.toISOString().slice(0, 19).replace("T", " ");
+          }
+        }
+
+        dbRow[col] = value;
+      });
+
+      if (!Object.keys(dbRow).length) continue;
+
+      const columns = Object.keys(dbRow);
+      const values = Object.values(dbRow);
+
+      const insertSQL = `
+        INSERT INTO \`${TABLE_NAME}\`
+        (${columns.map(c => `\`${c}\``).join(",")})
+        VALUES (${columns.map(() => "?").join(",")})
+      `;
+
+      await conn.execute(insertSQL, values);
+      insertedRows++;
+    }
+  }
+
+  console.log(`🎉 Inserted ${insertedRows} rows into "${TABLE_NAME}"`);
+}
+
+// ================= MAIN =================
+
+async function main() {
+  const conn = await mysql.createConnection(dbConfig);
+  console.log("✅ Connected to MySQL");
+
+  await importExcelToExistingTable(conn);
+
+  await conn.end();
+  console.log("🎉 Import completed successfully");
+}
+
+main().catch(err => {
+  console.error("❌ Error:", err);
+});

@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recharge Expiry Dashboard</title>
+
+<!-- ✅ Bootstrap 5 & Icons -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+body {
+  font-family: 'Poppins', sans-serif;
+  background: url("background.jpg") center/cover no-repeat; color: #0c0c0c;
+  min-height: 100vh;
+}
+
+/* Navbar background green gradient */
+#greenNavbar {
+  background-color: #145022;
+  color: #fff;
+  padding: 0.5rem 1rem;
+}
+
+/* Navbar brand text */
+#greenNavbar .navbar-brand {
+  color: #fff;
+  font-weight: bold;
+}
+
+/* Green ☰ menu button */
+.btn-menu-symbol {
+  background: linear-gradient(90deg, #1e7e34, #445e4f); /* green gradient for button */
+  color: #fff;
+  font-size: 24px;          /* size of ☰ */
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Remove Bootstrap dropdown arrow */
+.btn-menu-symbol::after {
+  display: none;
+}
+
+/* Hover effect */
+.btn-menu-symbol:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  color: #fff;
+}
+
+/* Dropdown items icons */
+.dropdown-item i {
+  color: #28a745;
+}
+
+/* Dashboard Title */
+h1 { font-weight: 700; color: #145022; text-align: center; margin-top: 20px; }
+
+/* Table Container */
+.table-container {
+  background-color: white;
+  border-radius: 15px;
+  box-shadow: 0 4px 20px rgba(148, 255, 185, 0.1);
+  padding: 20px;
+  width: 90%;
+  margin: 30px auto;
+  overflow: hidden;
+}
+
+/* Table Styling */
+.table thead th { background-color: #145022; color: white; position: sticky; top: 0; z-index: 1; }
+.table tbody tr { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.table tbody tr:hover { transform: scale(1.01); box-shadow: 0 2px 10px rgba(0,0,0,0.08); background-color: #f8fdf8; }
+
+/* Status Badges */
+.badge-active { background-color: #198754; color: white; padding: 6px 10px; border-radius: 12px; font-size: 0.85rem; }
+.badge-expired { background-color: #dc3545; color: white; padding: 6px 10px; border-radius: 12px; font-size: 0.85rem; }
+
+/* Progress Bars */
+.progress { height: 8px; border-radius: 4px; background-color: #e9ecef; }
+.progress-bar { border-radius: 4px; }
+.bg-success-gradient { background: linear-gradient(to right, #28a745, #7fd67f); }
+.bg-warning-gradient { background: linear-gradient(to right, #ffc107, #ffd98e); }
+.bg-danger-gradient { background: linear-gradient(to right, #dc3545, #f57a7a); }
+
+/* Buttons */
+.btn-custom { background-color: #145022; color: white; border: none; }
+.btn-custom:hover { background-color: #0f3d1b; }
+.download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #198754;
+  color: #fff;
+  border: none;
+  padding: 11px 10px;
+  font-size: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.download-btn i {
+  pointer-events: none;
+}
+
+.download-btn:hover {
+  background-color: #198754;
+}
+/* Search Bar */
+.search-bar { max-width: 400px; margin: 0 auto; }
+
+.pagination { justify-content: center; }
+</style>
+</head>
+
+<body>
+<!-- Navbar -->
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark" id="greenNavbar">
+  <div class="container-fluid">
+    <!-- Logo -->
+    <a class="navbar-brand d-flex align-items-center" href="#">
+      <img src="logo.jpg" alt="Logo" height="40" class="me-2">
+      Recharge Dashboard
+    </a>
+
+    <!-- Green ☰ Menu Button -->
+    <div class="ms-auto">
+      <div class="dropdown">
+        <button class="btn btn-menu-symbol" type="button" id="menuDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          ☰
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="menuDropdown">
+         
+          <li>
+            <button class="dropdown-item" id="insertRecord" onclick="openInsertModal()">
+              <i class="bi bi-plus-circle me-2"></i> Add Record
+            </button>
+          </li>
+          <li>
+            <button class="dropdown-item" id="historyBtn" onclick="openHistory()">
+              <i class="bi bi-clock-history me-2"></i> View History Log
+            </button>
+          </li>
+           <li>
+            <a class="dropdown-item" href="Dashboad.html">
+              <i class="bi bi-house-door-fill me-2"></i> Home
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- Page Title -->
+<h1 class="mt-4">
+  <i class="bi bi-graph-up-arrow text-success"></i> Recharge Expiry Dashboard
+</h1>
+
+<!-- Search -->
+<div class="search-bar my-3">
+  <input id="searchInput" type="text" class="form-control" placeholder="🔍 Search by Outlet, Operator, or Number...">
+</div>
+
+<!-- Table -->
+<div class="table-container">
+  <div class="table-responsive">
+    <table id="data-table" class="table table-hover align-middle text-center">
+      <thead>
+        <tr>
+          <th rowspan="2">ID</th>
+          <th rowspan="2">Outlet</th>
+          <th rowspan="2">Operator 1-Sim</th>
+          <th rowspan="2">Operator 2-Wired</th>
+          <th rowspan="2">Mobile</th>
+
+          <!-- Base Plan -->
+          <th colspan="3">Base Plan</th>
+          <th rowspan="2">Progress</th>
+
+          <!-- Upgrade Plan -->
+          <th colspan="3">Upgrade Plan</th>
+          <th rowspan="2">Progress</th>
+
+          <th rowspan="2">Actions</th>
+        </tr>
+        <tr>
+          <th>Start Date</th>
+          <th>End Date</th>
+          <th>Days Left</th>
+
+          <th>Start Date</th>
+          <th>End Date</th>
+          <th>Days Left</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <nav><ul class="pagination" id="pagination"></ul></nav>
+</div>
+
+
+<!-- Modal -->
+<div class="modal fade" id="dataModal" tabindex="-1" aria-modal="true" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 id="modalTitle" class="modal-title">Add Record</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="recordId">
+
+        <div class="mb-3">
+          <label for="outletName" class="form-label">Outlet Name</label>
+          <select id="outletName" class="form-select">
+            <option value="">Select Outlet</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="operatorName" class="form-label">Operator 1-SIM</label>
+          <select id="operatorName" class="form-select" >
+            <option value="">Select Operator</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="operator2" class="form-label">Operator 2-Wired</label>
+          <select id="operator2" class="form-select" >
+            <option value="">Select Operator</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="mobileNumber" class="form-label">Mobile Number</label>
+          <input type="text" id="mobileNumber" class="form-control">
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label for="startDate" class="form-label">Start Date</label>
+            <input type="date" id="startDate" class="form-control">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label for="endDate" class="form-label">End Date</label>
+            <input type="date" id="endDate" class="form-control">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button id="saveRecord" class="btn btn-custom">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Delete Options Modal -->
+<div class="modal fade" id="deleteOptionsModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">🗑️ Delete Options</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body text-center">
+        <p class="mb-3">
+          What would you like to delete?
+        </p>
+        <p class="text-muted small">
+          You can remove only the upgrade, or delete everything.
+        </p>
+      </div>
+
+      <div class="modal-footer justify-content-center gap-2">
+        <button id="deleteUpgradeBtn" class="btn btn-warning">
+          Delete Upgrade
+        </button>
+        <button id="deleteAllBtn" class="btn btn-danger">
+          Delete All
+        </button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">
+          Cancel
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- History Modal -->
+<div class="modal fade" id="historyModal" tabindex="-1" aria-modal="true" role="dialog">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">Activity History Log</h5>
+       
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Date Filters -->
+  <div class="row mb-3 align-items-end">
+  <div class="col">
+    <label class="form-label">Start Date</label>
+    <input type="date" id="historyStart" class="form-control">
+  </div>
+  <div class="col">
+    <label class="form-label">End Date</label>
+    <input type="date" id="historyEnd" class="form-control">
+  </div>
+  <div class="col-auto d-flex gap-2">
+    <button class="btn btn-sm btn-success" onclick="applyHistoryFilter()">
+      <i class="fas fa-filter"></i>
+    </button>
+    <button id="downloadHistoryBtn" class="btn btn-sm btn-success" onclick="downloadHistoryExcel()" title="Download CSV">
+      <i class="fas fa-download"></i>
+    </button>
+  </div>
+</div>
+
+
+  <hr>
+
+  <!-- Logs -->
+  <div id="historyContent"></div>
+        <!-- logs go here -->
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const modal = new bootstrap.Modal(document.getElementById("dataModal"));
+let allData = [];
+let currentPage = 1;
+const rowsPerPage = 10;
+const userRole = sessionStorage.getItem('userRole');
+const username = sessionStorage.getItem('username');
+let deleteRechargeId = null;
+let deleteInProgress = false;
+function formatDateForInput(dateString) {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); // Adjust for local timezone
+  return d.toISOString().slice(0, 10); // yyyy-MM-dd
+}
+console.log("userRole:",userRole)
+console.log("username:",username)
+if (!userRole) {
+  alert('Please log in first.');
+  window.location.href = 'login.html';
+}
+
+if (userRole === 'user') {
+  document.getElementById('insertRecord').style.display = 'inline-block';
+}
+
+// --- Safe modal opener ---
+function safeOpenModal(modalInstance) {
+  if (document.activeElement) document.activeElement.blur();
+  requestAnimationFrame(() => {
+    modalInstance.show();
+    const firstInput = modalInstance._element.querySelector("input, select, textarea, button");
+    if (firstInput) firstInput.focus();
+  });
+}
+function showNull(value) {
+  return (value === null || value === undefined || String(value).trim() === "")
+    ? "Null"
+    : value;
+}
+
+// --- Fetch & render data ---
+async function loadRechargeData() {
+  const res = await fetch("http://10.128.27.85:5000/api/recharge");
+  allData = await res.json();
+  renderTable();
+}
+// Updated: dates show “Null” if missing
+const formatDate = d => {
+  if (!d) return "Null";
+  return new Date(d).toLocaleDateString("en-GB");
+};
+
+function renderTable() {
+  const tbody = document.querySelector("#data-table tbody");
+  tbody.innerHTML = "";
+
+  const today = new Date();
+  const filter = document.getElementById("searchInput").value.toLowerCase();
+
+  // ✅ Filter data safely
+  const filtered = allData.filter(r =>
+    (r.outlet_name?.toLowerCase().includes(filter)) ||
+    (r.operator_name?.toLowerCase().includes(filter)) ||
+    (r.operator_2?.toLowerCase().includes(filter)) ||
+    (String(r.mobile_number)?.toLowerCase().includes(filter))
+  );
+
+  // ✅ Sort by ascending days left
+  filtered.sort((a, b) => {
+    const daysLeftA = Math.ceil((new Date(a.base_end_date) - today) / (1000 * 60 * 60 * 24));
+    const daysLeftB = Math.ceil((new Date(b.base_end_date) - today) / (1000 * 60 * 60 * 24));
+    return daysLeftA - daysLeftB;
+  });
+
+  // ✅ Pagination
+  const start = (currentPage - 1) * rowsPerPage;
+  const end = start + rowsPerPage;
+  const pageData = filtered.slice(start, end);
+
+  // ✅ Helper to format dates
+  const formatDate = d => d ? new Date(d).toLocaleDateString("en-GB") : "-";
+
+ pageData.forEach((r, i) => {
+  const today = new Date();
+
+  // Base plan dates
+  const baseStart = r.base_start_date ? new Date(r.base_start_date) : null;
+  const baseEnd = r.base_end_date ? new Date(r.base_end_date) : null;
+  const baseDaysLeft = baseEnd && today < baseEnd
+    ? Math.ceil((baseEnd - today) / (1000 * 60 * 60 * 24))
+    : 0;
+  const baseTotalDays = baseStart && baseEnd
+    ? Math.max(1, Math.ceil((baseEnd - baseStart) / (1000 * 60 * 60 * 24)))
+    : 1;
+  const baseProgress = Math.min(100, Math.max(0, ((baseTotalDays - baseDaysLeft) / baseTotalDays) * 100));
+  const baseProgressClass = baseDaysLeft < 3 ? "bg-danger-gradient"
+                        : baseDaysLeft < 7 ? "bg-warning-gradient"
+                        : "bg-success-gradient";
+
+  // Upgrade plan dates (optional)
+  const upgradeStart = r.upgrade_start_date ? new Date(r.upgrade_start_date) : null;
+  const upgradeEnd = r.upgrade_end_date ? new Date(r.upgrade_end_date) : null;
+
+  const upgradeDaysLeft = upgradeEnd && today < upgradeEnd
+    ? Math.ceil((upgradeEnd - today) / (1000 * 60 * 60 * 24))
+    : 0;
+  const upgradeTotalDays = upgradeStart && upgradeEnd
+    ? Math.max(1, Math.ceil((upgradeEnd - upgradeStart) / (1000 * 60 * 60 * 24)))
+    : 0;
+  const upgradeProgress = upgradeTotalDays > 0
+    ? Math.min(100, Math.max(0, ((upgradeTotalDays - upgradeDaysLeft) / upgradeTotalDays) * 100))
+    : 0;
+  const upgradeProgressClass = upgradeDaysLeft < 3 ? "bg-danger-gradient"
+                          : upgradeDaysLeft < 7 ? "bg-warning-gradient"
+                          : "bg-success-gradient";
+
+  tbody.innerHTML += `
+    <tr>
+      <td>${r.id}</td>
+      <td>${showNull(r.outlet_name)}</td>
+      <td>${showNull(r.operator_name)}</td>
+      <td>${showNull(r.operator_2)}</td>
+      <td>${showNull(r.mobile_number)}</td>
+
+      <!-- Base plan -->
+      <td>${formatDate(baseStart)}</td>
+      <td>${formatDate(baseEnd)}</td>
+      <td>${baseDaysLeft} days</td>
+      <td>
+        <div class="progress">
+          <div class="progress-bar ${baseProgressClass}" style="width:${baseProgress}%"></div>
+        </div>
+      </td>
+
+      <!-- Upgrade plan -->
+      <td>${upgradeStart ? formatDate(upgradeStart) : "-"}</td>
+      <td>${upgradeEnd ? formatDate(upgradeEnd) : "-"}</td>
+      <td>${upgradeDaysLeft > 0 ? upgradeDaysLeft + " days" : "-"}</td>
+      <td>
+        <div class="progress">
+          <div class="progress-bar ${upgradeProgressClass}" style="width:${upgradeProgress}%"></div>
+        </div>
+      </td>
+
+      <!-- Admin actions -->
+      <td>
+        ${userRole === "admin"
+          ? `
+          <button class="btn btn-warning btn-sm edit-btn" data-id="${r.id}">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button class="btn btn-danger btn-sm delete-btn" data-id="${r.id}">
+            <i class="bi bi-trash"></i>
+          </button>
+          <button class="btn btn-info btn-sm upgrade-btn" data-id="${r.id}">
+            <i class="bi bi-arrow-up-circle"></i>
+          </button>
+          `
+          : ""
+        }
+      </td>
+    </tr>
+
+      <!-- 🔽 INLINE POPUP ROW (IMMEDIATELY AFTER) -->
+  <!-- 🔽 INLINE POPUP ROW (IMMEDIATELY AFTER) -->
+<tr class="upgrade-row d-none" id="upgrade-row-${r.id}">
+  <td colspan="11">
+    <div class="border rounded p-3 bg-light">
+      <input type="hidden" id="upgrade-recharge-${r.id}" value="${r.id}">
+      <input type="hidden" id="upgrade-outlet-${r.id}" value="${r.outlet_name}">
+      <input type="hidden" id="upgrade-upgraded-${r.id}" value="${r.upgraded_by || ''}">
+      <h6 class="text-success mb-3">
+        <i class="bi bi-arrow-up-circle"></i> Upgrade Plan
+      </h6>
+      
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Plan</label>
+          <input type="text" class="form-control" id="plan-${r.id}" 
+                 value="${r.plan_name ? r.plan_name : ''}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Start Date</label>
+          <input type="date" class="form-control" id="upgrade-start-${r.id}" 
+                 value="${formatDateForInput(r.upgrade_start_date) ? formatDateForInput(r.upgrade_start_date)  : ''}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">End Date</label>
+          <input type="date" class="form-control" id="upgrade-end-${r.id}" 
+                 value="${formatDateForInput(r.upgrade_end_date)  ?formatDateForInput(r.upgrade_end_date)  : ''}">
+        </div>
+
+        <div class="col-md-2 d-flex align-items-end">
+          <button class="btn btn-success w-100 save-upgrade-btn" data-id="${r.id}">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  </td>
+</tr>
+
+    `;
+  });
+
+  renderPagination(filtered.length);
+}
+
+
+function renderPagination(totalRows) {
+  const totalPages = Math.ceil(totalRows / rowsPerPage);
+  const pagination = document.getElementById("pagination");
+  pagination.innerHTML = "";
+  for (let i = 1; i <= totalPages; i++) {
+    pagination.innerHTML += `
+      <li class="page-item ${i === currentPage ? 'active' : ''}">
+        <button class="page-link" onclick="changePage(${i})">${i}</button>
+      </li>`;
+  }
+}
+
+function changePage(p) { currentPage = p; renderTable(); }
+document.getElementById("searchInput").addEventListener("keyup", () => { currentPage = 1; renderTable(); });
+
+// --- Dropdowns ---
+let availableOutlets = ["CAN","ARY","TVK","TTG","KMU","TJR","CVL","CGL","CKP","MEN","MDS","MDT","DVK","SLA","HSR","UDT","AVI","KAR","PAL","SUL","KGR","VNR","DPM","ATR","TNI","DGL","TEN","TYR",
+   "VEL","MTP","BVN","RAS","PVL","AVK","CKD","PDK","EDE","CVV","NKA","NKB","MPA","PRD","TRM","USP","VRI","BOD","UPL","DPJ","KDM","MUL","CAV","MSR","PYM","NEL","MDU","SGE","AYP","VDS","MEL",
+   "RMD","ALR","PLR","TVY","BDG","SLC","PLB","KRP","NKC","TGD","ERL","EDN","TNK","AMP","OML","KKV","KKD","POC","MTL","NKD"];
+let availableOperators1 = ["JIO","AIRTEL","Vi","BSNL"];
+let availableOperators2 = ["JIO","AIRTEL","BSNL","SWIBI","NONE"];
+
+function populateDropdowns(currentOutlet = "", currentOperator = "", currentOperator2 = "") {
+  const outletSelect = document.getElementById("outletName");
+  const operator1Select = document.getElementById("operatorName");
+  const operator2Select = document.getElementById("operator2");
+
+  outletSelect.innerHTML = `<option value="">Select Outlet</option>`;
+  operator1Select.innerHTML = `<option value="">Select Operator 1</option>`;
+  operator2Select.innerHTML = `<option value="">Select Operator 2</option>`;
+
+  const usedOutlets = allData.map(d => d.outlet_name).filter(o => o !== currentOutlet);
+  const usedOperators1 = allData.map(d => d.operator_name).filter(o => o !== currentOperator);
+  const usedOperators2 = allData.map(d => d.operator_2).filter(o => o !== currentOperator2);
+
+    // ✅ Sort outlets alphabetically before appending
+  availableOutlets
+    .filter(o => !usedOutlets.includes(o) || o === currentOutlet)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach(o => outletSelect.append(new Option(o, o)));
+    
+  availableOperators1.forEach(o => operator1Select.append(new Option(o,o)));
+  availableOperators2.forEach(o => operator2Select.append(new Option(o,o)));
+
+  if (currentOutlet) outletSelect.value = currentOutlet;
+  if (currentOperator) operator1Select.value = currentOperator;
+  if (currentOperator2) operator2Select.value = currentOperator2;
+}
+
+// --- Open Insert Modal ---
+function openInsertModal() {
+  document.getElementById("modalTitle").textContent = "Add Record";
+  document.getElementById("recordId").value = "";
+  ["mobileNumber","startDate","endDate"].forEach(id => document.getElementById(id).value = "");
+  populateDropdowns();
+  document.getElementById("saveRecord").textContent = "Save";
+  safeOpenModal(modal);
+}
+
+window.addEventListener("load", () => {
+ const userRole = sessionStorage.getItem('userRole');
+  if (userRole == "admin"){
+    document.getElementById("historyBtn").style.display = "inline-block";
+
+  }
+});
+// --- Open History Log ---
+async function openHistory(startDate = "", endDate = "") {
+  try {
+    const userRole = sessionStorage.getItem('userRole');
+    const loggedInUser = sessionStorage.getItem('username') || 'Unknown';
+
+    let url = "http://10.128.27.85:5000/api/history";
+
+    // ADD DATE FILTERS TO BACKEND
+    const params = new URLSearchParams();
+    if (startDate) params.append("start", startDate);
+    if (endDate) params.append("end", endDate);
+    if ([...params].length > 0) {
+      url += "?" + params.toString(); // << append query params to URL
+}
+
+    
+    
+    const res = await fetch(url, {
+      headers: { "role": userRole, "User": loggedInUser }
+    });
+
+    if (res.status === 403) {
+      alert("Access denied - admin only");
+      return;
+    }
+    let logs = await res.json();
+    const container = document.getElementById("historyContent");
+    container.innerHTML = "";
+
+    if (!Array.isArray(logs) || logs.length === 0) {
+      container.innerHTML = "<p>No activity found</p>";
+    }
+
+for (const log of logs) {
+
+
+  const row = document.createElement("div");
+  row.className = "border rounded p-2 mb-2 bg-light";
+
+  row.innerHTML = `
+    <strong>User:</strong> ${log.user_name}<br>
+    <strong>Action:</strong> ${log.action}<br>
+
+
+
+    <strong>Description:</strong>
+    <pre style="background:#f8f9fa; padding:8px; border-radius:5px; white-space:pre-wrap;">${log.details}</pre>
+
+    <small style="color:#777;">${new Date(log.timestamp).toLocaleString()}</small>
+  `;
+
+  container.appendChild(row);
+}
+
+    new bootstrap.Modal(document.getElementById("historyModal")).show();
+
+    //const modalInstance = new bootstrap.Modal(document.getElementById("historyModal"));
+    //modalInstance.show();
+
+
+  } catch (err) {
+    console.error("openHistory() error:", err);
+    alert("Unable to load history.");
+  }
+}
+function applyHistoryFilter() {
+  const start = document.getElementById("historyStart").value;
+  const end = document.getElementById("historyEnd").value;
+
+   if (!start && !end) {
+    alert("Please select at least one date.");
+    return;
+  }
+
+  openHistory(start, end);
+}
+// --- DOWNLOAD HISTORY AS EXCEL ---
+function downloadHistoryExcel() {
+  const historyDiv = document.getElementById("historyContent");
+  const entries = [...historyDiv.querySelectorAll(".border")];
+
+  if (entries.length === 0) {
+    alert("No history available to download.");
+    return;
+  }
+
+  const rows = entries.map(entry => {
+    return {
+      User: entry.querySelector("strong:nth-of-type(1)").nextSibling.textContent.trim(),
+      Action: entry.querySelector("strong:nth-of-type(2)").nextSibling.textContent.trim(),
+      Description: entry.querySelector("pre").textContent.trim(),
+      Timestamp: entry.querySelector("small").textContent.trim()
+    };
+  });
+
+  // Convert to Excel
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "History Log");
+
+  // Download file
+  XLSX.writeFile(workbook, "history_log.xlsx");
+}
+
+
+// --- Save Record ---
+document.getElementById("saveRecord").addEventListener("click", async () => {
+  const id = recordId.value;
+  const payload = {
+    outlet_name: outletName.value || null,
+    operator_name: operatorName.value || null,
+    operator_2: operator2.value || null,
+    mobile_number: mobileNumber.value || null,
+    base_start_date: startDate.value === "" ? null: startDate.value,
+    base_end_date: endDate.value === "" ? null: endDate.value
+  };
+  const url = id ? `http://10.128.27.85:5000/api/update/${id}` : `http://10.128.27.85:5000/api/insert`;
+  const res = await fetch(url, { method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json","User": sessionStorage.getItem("username"),   // 🔥 REQUIRED
+    "role": sessionStorage.getItem("userRole")  }, body: JSON.stringify(payload) });
+  const data = await res.json();
+  alert(data.message || (id ? "Updated!" : "Added!"));
+  modal.hide();
+  loadRechargeData();
+});
+
+// --- Edit/Delete ---
+document.addEventListener("click", async (e) => {
+  if (e.target.closest(".edit-btn")) {
+    if (userRole !== 'admin') return alert("No permission");
+    const id = e.target.closest(".edit-btn").dataset.id;
+    const record = allData.find(r => r.id == id);
+    if (!record) return alert("Record not found");
+    document.getElementById("modalTitle").textContent = "Edit Record";
+    document.getElementById("recordId").value = record.id;
+    populateDropdowns(record.outlet_name, record.operator_name, record.operator_2);
+    document.getElementById("mobileNumber").value = record.mobile_number;
+
+    
+     // ---- FIX DATE SHIFT ISSUE ----
+    function fixDateForInput(dateString) {
+        const d = new Date(dateString);
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        return d.toISOString().slice(0, 10);
+    }
+
+    document.getElementById("startDate").value = fixDateForInput(record.base_start_date);
+    document.getElementById("endDate").value = fixDateForInput(record.base_end_date);
+    document.getElementById("saveRecord").textContent = "Update";
+    safeOpenModal(modal);
+  }
+
+
+// 🔹 Single modal element
+const deleteModalEl = document.getElementById("deleteOptionsModal");
+let deleteModal = new bootstrap.Modal(deleteModalEl, {
+  backdrop: "static",
+  keyboard: false
+});
+
+let deleteInProgress = false;
+let deleteRechargeId = null;
+
+// Function to force close modal and remove backdrop
+function closeDeleteModal() {
+  if (deleteModalEl.classList.contains("show")) {
+    deleteModal.hide();
+  }
+
+  // Remove leftover backdrops
+  document.querySelectorAll(".modal-backdrop").forEach(b => b.remove());
+}
+
+// Delete single upgrade
+document.getElementById("deleteUpgradeBtn").addEventListener("click", async function () {
+   if (!deleteRechargeId) {
+    showToast("No item selected to delete", "warning");
+    return;
+  }
+  if (deleteInProgress) return;
+  deleteInProgress = true;
+  this.disabled = true;
+
+  try {
+    const res = await fetch(
+      `http://10.128.27.85:5000/api/recharge-upgrades/${deleteRechargeId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "User": sessionStorage.getItem("username"),
+          "role": sessionStorage.getItem("userRole")
+        }
+      }
+    );
+
+    if (res.status !== 200 && res.status !== 404) {
+      const data = await res.json();
+      throw new Error(data.error || "Upgrade delete failed");
+    }
+
+    // ✅ Close modal safely
+    closeDeleteModal();
+    loadRechargeData();
+
+  } catch (err) {
+    console.error(err);
+    showToast(err.message, "danger");
+  } finally {
+    deleteInProgress = false;
+    this.disabled = false;
+  }
+});
+
+// Delete upgrade + recharge
+document.getElementById("deleteAllBtn").addEventListener("click", async function () {
+   if (!deleteRechargeId) {
+    showToast("No item selected to delete", "warning");
+    return;
+  }
+  if (deleteInProgress) return;
+  deleteInProgress = true;
+  this.disabled = true;
+
+  try {
+    // Delete upgrade
+    await fetch(
+      `http://10.128.27.85:5000/api/recharge-upgrades/${deleteRechargeId}`,
+      { method: "DELETE", headers: { "User": sessionStorage.getItem("username"), "role": sessionStorage.getItem("userRole") } }
+    );
+
+    // Delete recharge
+    const res = await fetch(
+      `http://10.128.27.85:5000/api/recharge/${deleteRechargeId}`,
+      { method: "DELETE", headers: { "User": sessionStorage.getItem("username"), "role": sessionStorage.getItem("userRole") } }
+    );
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Recharge delete failed");
+    }
+
+    // ✅ Close modal safely
+    closeDeleteModal();
+    loadRechargeData();
+
+  } catch (err) {
+    console.error(err);
+    showToast(err.message, "danger");
+  } finally {
+    deleteInProgress = false;
+    this.disabled = false;
+  }
+});
+
+// Open modal
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".delete-btn")) {
+    if (userRole !== "admin") return alert("No permission");
+
+    deleteRechargeId = e.target.closest(".delete-btn").dataset.id;
+
+    // Always create a new instance in case DOM changed
+    deleteModal = new bootstrap.Modal(deleteModalEl, {
+      backdrop: "static",
+      keyboard: false
+    });
+    deleteModal.show();
+  }
+
+  // Toggle upgrade row
+  if (e.target.closest(".upgrade-btn")) {
+    const id = e.target.closest(".upgrade-btn").dataset.id;
+
+    document.querySelectorAll(".upgrade-row").forEach(row => {
+      if (row.id !== `upgrade-row-${id}`) row.classList.add("d-none");
+    });
+
+    document.getElementById(`upgrade-row-${id}`).classList.toggle("d-none");
+  }
+});
+
+
+  /* 💾 SAVE UPGRADE */
+  if (e.target.closest(".save-upgrade-btn")) {
+    const id = e.target.closest(".save-upgrade-btn").dataset.id;
+    const rechargeId = document.getElementById(`upgrade-recharge-${id}`).value;
+    const outlet = document.getElementById(`upgrade-outlet-${id}`).value;
+    const plan = document.getElementById(`plan-${id}`).value;
+    const start = formatDateForInput(document.getElementById(`upgrade-start-${id}`).value);
+    const end = formatDateForInput(document.getElementById(`upgrade-end-${id}`).value);
+
+    if (!plan || !start || !end) {
+      alert("Please fill all upgrade details");
+      return;
+    }
+
+    const res = await fetch(`http://10.128.27.85:5000/api/upgrade/${id}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json", 
+        "User": sessionStorage.getItem("username"),  
+        "role": sessionStorage.getItem("userRole")
+      },
+      body: JSON.stringify({
+        recharge_id: rechargeId,
+        outlet_name: outlet,
+        plan_name: plan,
+        upgrade_start_date: start,
+        upgrade_end_date: end, 
+        upgraded_by: sessionStorage.getItem("username")
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("Upgrade Error:", data);
+      alert("Error upgrading: " + (data.message || "Unknown error"));
+      return;
+    }
+
+    alert(data.message || "Upgrade successful");
+
+    // Close the upgrade row popup after save
+    document.getElementById(`upgrade-row-${id}`).classList.add("d-none");
+
+    loadRechargeData();
+  
+  }
+
+}); 
+
+function showToast(message, type = "success") {
+  const toast = document.createElement("div");
+  toast.className = `toast align-items-center text-bg-${type} border-0 position-fixed top-0 end-0 m-3`;
+  toast.setAttribute("role", "alert");
+  toast.innerHTML = `
+    <div class="d-flex">
+      <div class="toast-body">${message}</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  `;
+  document.body.appendChild(toast);
+  new bootstrap.Toast(toast, { delay: 3000 }).show();
+  toast.addEventListener("hidden.bs.toast", () => toast.remove());
+}
+window.history.pushState(null, "", window.location.href);
+window.onpopstate = function () { window.history.pushState(null, "", window.location.href); };
+
+loadRechargeData();
+</script>
+</body>
+</html>

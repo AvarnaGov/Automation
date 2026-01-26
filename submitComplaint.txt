@@ -1,0 +1,49 @@
+ const res = await fetch(API + "/api/complaints");
+ allComplaints = await res.json();
+  applyColumnFilters();
+  const tbody = document.getElementById("complaintsTable");
+  tbody.innerHTML = "";
+
+  allComplaints.forEach(row => {
+    // Format created_at as dd/mm/yyyy
+    let createdDate = new Date(row.date);
+    let formattedDate = `${String(createdDate.getDate()).padStart(2, '0')}/` +
+                        `${String(createdDate.getMonth() + 1).padStart(2, '0')}/` +
+                        `${createdDate.getFullYear()}`;
+
+    let statusClass = row.status === "Pending" ? "status-pending" :
+                      row.status === "In Progress" ? "status-progress" :
+                      "status-resolved";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${row.ticket_no}</td>
+      <td>${formattedDate}</td>
+      <td>${row.name_of_the_outlet}</td>
+      <td>${row.code}</td>
+      <td>${row.nature_of_complaint}</td>
+      <td>${row.breakdown__preventive}</td>
+      <td>${row.details_of_work_done}</td>
+      <td>${row.attended_by}</td>
+      <td>${row.reported_to}</td>
+      
+      <td class="${statusClass}">${row.status}</td>
+      <td>
+        <select 
+          onchange="updateStatus('${row.ticket_no}',this.value)" 
+          ${row.status_change_count >= 2 ? "disabled" : ""} 
+          title="${row.status_change_count >= 3 ? 'Max 2 changes reached' : `${2 - row.status_change_count} changes remaining`}"
+        >
+          <option ${row.status === 'Pending' ? 'selected' : ''}>Pending</option>
+          <option ${row.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+          <option ${row.status === 'Resolved' ? 'selected' : ''}>Resolved</option>
+        </select>
+      </td>
+      <td>
+       <button class="btn btn-danger btn-sm delete-btn" data-id="${row.ticket_no}">
+              <i class ="bi bi-trash"></i>
+      </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });

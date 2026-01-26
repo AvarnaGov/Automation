@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard SPA</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+body { font-family: 'Poppins', sans-serif; margin:0; }
+#sidebar { 
+  position: fixed; top:0; left:-250px; width:250px; height:100%; 
+  background:#145022; color:white; transition:0.3s; padding-top:20px; z-index:1000;
+}
+#sidebar.show { left:0; }
+#sidebar .nav-item { padding:12px 20px; cursor:pointer; }
+#sidebar .nav-item:hover { background:#0f3d1b; }
+#overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:none; z-index:500; }
+#overlay.show { display:block; }
+#content { margin-left:0; transition:0.3s; padding:20px; }
+#content.shift { margin-left:250px; }
+
+.btn-menu { position:fixed; top:15px; left:15px; z-index:1500; }
+</style>
+</head>
+<body>
+
+<!-- Overlay -->
+<div id="overlay"></div>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <h4 class="text-center mb-3">Menu</h4>
+  <div class="nav-item" onclick="loadPage('recharge14.html')"><i class="bi bi-battery-charging me-2"></i> Recharge</div>
+  <div class="nav-item" onclick="loadPage('history')"><i class="bi bi-clock-history me-2"></i> History</div>
+  <div class="nav-item bg-danger mt-3" onclick="logout()"><i class="bi bi-box-arrow-right me-2"></i> Logout</div>
+</div>
+
+<!-- Menu Button -->
+<button class="btn btn-success btn-menu" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+
+<!-- Main Content -->
+<div id="content">
+  <h1>Welcome to Dashboard</h1>
+  <p>Select a menu item to load content.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+
+// --- Sidebar Toggle ---
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('show');
+  document.getElementById('overlay').classList.toggle('show');
+}
+
+// Close sidebar when clicking outside
+document.getElementById('overlay').addEventListener('click', toggleSidebar);
+
+// --- Load Page Content ---
+function loadPage(page) {
+  toggleSidebar(); // close menu after click
+  const content = document.getElementById('content');
+
+  if (page === 'dashboard') {
+    content.innerHTML = `<h1>Dashboard</h1><p>Dashboard content goes here...</p>`;
+  } 
+  else if (page === 'recharge29.html') {
+    content.innerHTML = `
+      <h1><i class="bi bi-graph-up-arrow text-success"></i> Recharge Expiry Dashboard</h1>
+      <div class="search-bar my-3">
+        <input id="searchInput" type="text" class="form-control" placeholder="🔍 Search by Outlet, Operator, or Number...">
+      </div>
+      <div class="table-container">
+        <div class="table-responsive">
+          <table id="data-table" class="table table-hover align-middle text-center">
+            <thead>
+              <tr>
+                <th>ID</th><th>Outlet</th><th>Operator 1-Sim</th><th>Operator 2-Wired</th>
+                <th>Mobile</th><th>Start Date</th><th>End Date</th><th>Days Left</th>
+                <th>Status</th><th>Progress</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="mt-3">Recharge modals and actions will work here...</p>
+    `;
+
+    // --- Call your Recharge JS functions here ---
+    // e.g., loadRechargeData();
+  }
+  else if (page === 'history') {
+    content.innerHTML = `<h1>History Log</h1><p>History content goes here...</p>`;
+  }
+}
+
+// --- Logout ---
+function logout() {
+  if (confirm('Logout?')) {
+    sessionStorage.clear();
+    window.location.href = 'login.html';
+  }
+}
+
+</script>
+</body>
+</html>

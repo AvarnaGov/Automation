@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recharge Expiry Dashboard</title>
+
+<!-- ✅ Bootstrap 5 & Icons -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<style>
+body {
+  font-family: 'Poppins', sans-serif;
+  background: url("background.jpg") center/cover no-repeat; color: #0c0c0c;
+  min-height: 100vh;
+}
+
+/* Navbar */
+.navbar { background-color: #145022; }
+.navbar-brand { font-weight: 700; color: white !important; }
+.nav-link { color: #fff !important; }
+
+/* Dashboard Title */
+h1 { font-weight: 700; color: #145022; text-align: center; margin-top: 20px; }
+
+/* Table Container */
+.table-container {
+  background-color: white;
+  border-radius: 15px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  padding: 20px;
+  width: 90%;
+  margin: 30px auto;
+  overflow: hidden;
+}
+
+/* Table Styling */
+.table thead th { background-color: #145022; color: white; position: sticky; top: 0; z-index: 1; }
+.table tbody tr { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.table tbody tr:hover { transform: scale(1.01); box-shadow: 0 2px 10px rgba(0,0,0,0.08); background-color: #f8fdf8; }
+
+/* Status Badges */
+.badge-active { background-color: #198754; color: white; padding: 6px 10px; border-radius: 12px; font-size: 0.85rem; }
+.badge-expired { background-color: #dc3545; color: white; padding: 6px 10px; border-radius: 12px; font-size: 0.85rem; }
+
+/* Progress Bars */
+.progress { height: 8px; border-radius: 4px; background-color: #e9ecef; }
+.progress-bar { border-radius: 4px; }
+.bg-success-gradient { background: linear-gradient(to right, #28a745, #7fd67f); }
+.bg-warning-gradient { background: linear-gradient(to right, #ffc107, #ffd98e); }
+.bg-danger-gradient { background: linear-gradient(to right, #dc3545, #f57a7a); }
+
+/* Buttons */
+.btn-custom { background-color: #145022; color: white; border: none; }
+.btn-custom:hover { background-color: #0f3d1b; }
+
+/* Search Bar */
+.search-bar { max-width: 400px; margin: 0 auto; }
+
+.pagination { justify-content: center; }
+</style>
+</head>
+
+<body>
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#"><img src="logo.jpg" alt="Logo" height="40" class="me-2">Recharge Dashboard</a>
+    <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <button id="insertRecord" class="btn btn-success me-2" onclick="openInsertModal()"><i class="bi bi-plus-circle"></i> Add Record</button>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<h1><i class="bi bi-graph-up-arrow text-success"></i> Recharge Expiry Dashboard</h1>
+
+<!-- Search -->
+<div class="search-bar my-3">
+  <input id="searchInput" type="text" class="form-control" placeholder="🔍 Search by Outlet, Operator, or Number...">
+</div>
+
+<!-- Table -->
+<div class="table-container">
+  <div class="table-responsive">
+    <table id="data-table" class="table table-hover align-middle text-center">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Outlet</th>
+          <th>Operator 1</th>
+          <th>Operator 2</th>
+          <th>Mobile</th>
+          <th>Start Date</th>
+          <th>End Date</th>
+          <th>Days Left</th>
+          <th>Status</th>
+          <th>Progress</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <nav><ul class="pagination" id="pagination"></ul></nav>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="dataModal" tabindex="-1" aria-modal="true" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 id="modalTitle" class="modal-title">Add Record</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="recordId">
+
+        <div class="mb-3">
+          <label for="outletName" class="form-label">Outlet Name</label>
+          <select id="outletName" class="form-select" required>
+            <option value="">Select Outlet</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="operatorName" class="form-label">Operator 1</label>
+          <select id="operatorName" class="form-select" required>
+            <option value="">Select Operator</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="operator2" class="form-label">Operator 2</label>
+          <select id="operator2" class="form-select" required>
+            <option value="">Select Operator</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="mobileNumber" class="form-label">Mobile Number</label>
+          <input type="text" id="mobileNumber" class="form-control">
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label for="startDate" class="form-label">Start Date</label>
+            <input type="date" id="startDate" class="form-control">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label for="endDate" class="form-label">End Date</label>
+            <input type="date" id="endDate" class="form-control">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button id="saveRecord" class="btn btn-custom">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const modal = new bootstrap.Modal(document.getElementById("dataModal"));
+let allData = [];
+let currentPage = 1;
+const rowsPerPage = 8;
+const userRole = sessionStorage.getItem('userRole');
+
+if (!userRole) {
+  alert('Please log in first.');
+  window.location.href = 'login.html';
+}
+
+if (userRole === 'user') {
+  document.getElementById('insertRecord').style.display = 'inline-block';
+}
+
+// --- Safe modal opener ---
+function safeOpenModal(modalInstance) {
+  if (document.activeElement) document.activeElement.blur();
+  requestAnimationFrame(() => {
+    modalInstance.show();
+    const firstInput = modalInstance._element.querySelector("input, select, textarea, button");
+    if (firstInput) firstInput.focus();
+  });
+}
+
+// --- Fetch & render data ---
+async function loadRechargeData() {
+  const res = await fetch("http://localhost:5000/api/recharge");
+  allData = await res.json();
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.querySelector("#data-table tbody");
+  tbody.innerHTML = "";
+  const today = new Date();
+  const filter = document.getElementById("searchInput").value.toLowerCase();
+
+  const filtered = allData.filter(r =>
+    r.outlet_name.toLowerCase().includes(filter) ||
+    r.operator_name.toLowerCase().includes(filter) ||
+    r.operator_2.toLowerCase().includes(filter) ||
+    r.mobile_number.toLowerCase().includes(filter)
+  );
+
+  const start = (currentPage - 1) * rowsPerPage;
+  const end = start + rowsPerPage;
+  const pageData = filtered.slice(start, end);
+
+  const formatDate = d => new Date(d).toLocaleDateString("en-GB");
+
+  pageData.forEach((r, i) => {
+    const startDate = new Date(r.start_date);
+    const endDate = new Date(r.end_date);
+    const totalDays = Math.ceil((endDate - startDate) / (1000*60*60*24));
+    const daysLeft = Math.ceil((endDate - today) / (1000*60*60*24));
+    const progress = Math.max(0, ((totalDays - daysLeft) / totalDays) * 100);
+    const progressClass = daysLeft < 3 ? "bg-danger-gradient"
+      : daysLeft < 7 ? "bg-warning-gradient" : "bg-success-gradient";
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${String(start + i + 1).padStart(2, '0')}</td>
+        <td>${r.outlet_name}</td>
+        <td>${r.operator_name}</td>
+        <td>${r.operator_2}</td>
+        <td>${r.mobile_number}</td>
+        <td>${formatDate(r.start_date)}</td>
+        <td>${formatDate(r.end_date)}</td>
+        <td>${daysLeft > 0 ? daysLeft : 0}</td>
+        <td><span class="badge ${daysLeft <= 0 ? 'badge-expired' : 'badge-active'}">${daysLeft <= 0 ? 'Expired' : 'Active'}</span></td>
+        <td><div class="progress"><div class="progress-bar ${progressClass}" style="width:${progress}%"></div></div></td>
+        <td>
+          ${userRole === 'admin' ? `
+          <button class="btn btn-sm btn-outline-primary edit-btn" data-id="${r.id}">
+            <i class="bi bi-pencil-square"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${r.id}">
+            <i class="bi bi-trash"></i>
+          </button>` : ''}
+        </td>
+      </tr>
+    `;
+  });
+
+  renderPagination(filtered.length);
+}
+
+function renderPagination(totalRows) {
+  const totalPages = Math.ceil(totalRows / rowsPerPage);
+  const pagination = document.getElementById("pagination");
+  pagination.innerHTML = "";
+  for (let i = 1; i <= totalPages; i++) {
+    pagination.innerHTML += `
+      <li class="page-item ${i === currentPage ? 'active' : ''}">
+        <button class="page-link" onclick="changePage(${i})">${i}</button>
+      </li>`;
+  }
+}
+
+function changePage(p) { currentPage = p; renderTable(); }
+document.getElementById("searchInput").addEventListener("keyup", () => { currentPage = 1; renderTable(); });
+
+// --- Dropdowns ---
+let availableOutlets = ["TJR","KMU","MEN","CKP","DVK","CVL","SLA","CAN","ARY","TVK"];
+let availableOperators1 = ["JIO","AIRTEL","Vi","BSNL"];
+let availableOperators2 = ["JIO","AIRTEL","BSNL","SWIBI"];
+
+function populateDropdowns(currentOutlet = "", currentOperator = "", currentOperator2 = "") {
+  const outletSelect = document.getElementById("outletName");
+  const operator1Select = document.getElementById("operatorName");
+  const operator2Select = document.getElementById("operator2");
+
+  outletSelect.innerHTML = `<option value="">Select Outlet</option>`;
+  operator1Select.innerHTML = `<option value="">Select Operator 1</option>`;
+  operator2Select.innerHTML = `<option value="">Select Operator 2</option>`;
+
+  const usedOutlets = allData.map(d => d.outlet_name).filter(o => o !== currentOutlet);
+  const usedOperators1 = allData.map(d => d.operator_name).filter(o => o !== currentOperator);
+  const usedOperators2 = allData.map(d => d.operator_2).filter(o => o !== currentOperator2);
+
+  availableOutlets.forEach(o => { if (!usedOutlets.includes(o) || o === currentOutlet) outletSelect.append(new Option(o,o)); });
+  availableOperators1.forEach(o => operator1Select.append(new Option(o,o)));
+  availableOperators2.forEach(o => operator2Select.append(new Option(o,o)));
+
+  if (currentOutlet) outletSelect.value = currentOutlet;
+  if (currentOperator) operator1Select.value = currentOperator;
+  if (currentOperator2) operator2Select.value = currentOperator2;
+}
+
+// --- Open Insert Modal ---
+function openInsertModal() {
+  document.getElementById("modalTitle").textContent = "Add Record";
+  document.getElementById("recordId").value = "";
+  ["mobileNumber","startDate","endDate"].forEach(id => document.getElementById(id).value = "");
+  populateDropdowns();
+  document.getElementById("saveRecord").textContent = "Save";
+  safeOpenModal(modal);
+}
+
+// --- Save Record ---
+document.getElementById("saveRecord").addEventListener("click", async () => {
+  const id = recordId.value;
+  const payload = {
+    outlet_name: outletName.value,
+    operator_name: operatorName.value,
+    operator_2: operator2.value,
+    mobile_number: mobileNumber.value,
+    start_date: startDate.value,
+    end_date: endDate.value
+  };
+  const url = id ? `http://localhost:5000/api/update/${id}` : `http://localhost:5000/api/insert`;
+  const res = await fetch(url, { method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  const data = await res.json();
+  alert(data.message || (id ? "Updated!" : "Added!"));
+  modal.hide();
+  loadRechargeData();
+});
+
+// --- Edit/Delete ---
+document.addEventListener("click", async (e) => {
+  if (e.target.closest(".edit-btn")) {
+    if (userRole !== 'admin') return alert("No permission");
+    const id = e.target.closest(".edit-btn").dataset.id;
+    const record = allData.find(r => r.id == id);
+    if (!record) return alert("Record not found");
+    document.getElementById("modalTitle").textContent = "Edit Record";
+    document.getElementById("recordId").value = record.id;
+    populateDropdowns(record.outlet_name, record.operator_name, record.operator_2);
+    document.getElementById("mobileNumber").value = record.mobile_number;
+    document.getElementById("startDate").value = record.start_date.split("T")[0];
+    document.getElementById("endDate").value = record.end_date.split("T")[0];
+    document.getElementById("saveRecord").textContent = "Update";
+    safeOpenModal(modal);
+  }
+  if (e.target.closest(".delete-btn")) {
+    if (userRole !== 'admin') return alert("No permission");
+    const id = e.target.closest(".delete-btn").dataset.id;
+    if (!confirm("Are you sure?")) return;
+    const res = await fetch(`http://localhost:5000/api/recharge/${id}`, { method: "DELETE" });
+    const data = await res.json();
+    alert(data.message || "Deleted!");
+    loadRechargeData();
+  }
+});
+
+window.history.pushState(null, "", window.location.href);
+window.onpopstate = function () { window.history.pushState(null, "", window.location.href); };
+
+loadRechargeData();
+</script>
+</body>
+</html>
+
+
